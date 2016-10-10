@@ -4,7 +4,8 @@ import org.randoom.setlx.exceptions.IncorrectNumberOfParametersException;
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
+import org.randoom.setlx.parameters.ParameterList;
 import org.randoom.setlx.statements.Block;
 import org.randoom.setlx.utilities.*;
 
@@ -25,7 +26,7 @@ import java.util.List;
  */
 public class Procedure extends ImmutableValue {
     // functional character used in terms
-    private   final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(Procedure.class);
+    private   final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(Procedure.class);
 
     /**
      * List of parameters.
@@ -47,8 +48,8 @@ public class Procedure extends ImmutableValue {
      * @param statements statements in the body of the procedure
      */
     public Procedure(final ParameterList parameters, final Block statements) {
-        this.parameters = ImmutableCodeFragment.unify(parameters);
-        this.statements = ImmutableCodeFragment.unify(statements);
+        this.parameters = parameters;
+        this.statements = statements;
         this.object     = null;
     }
 
@@ -72,21 +73,22 @@ public class Procedure extends ImmutableValue {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
     ) {
         /* collect and optimize the inside */
-        final List<String> innerBoundVariables   = new ArrayList<String>();
-        final List<String> innerUnboundVariables = new ArrayList<String>();
-        final List<String> innerUsedVariables    = new ArrayList<String>();
+        final List<String> innerBoundVariables   = new ArrayList<>();
+        final List<String> innerUnboundVariables = new ArrayList<>();
+        final List<String> innerUsedVariables    = new ArrayList<>();
 
         // add all parameters to bound
         parameters.collectVariablesAndOptimize(state, innerBoundVariables, innerBoundVariables, innerBoundVariables);
 
         statements.collectVariablesAndOptimize(state, innerBoundVariables, innerUnboundVariables, innerUsedVariables);
+        return false;
     }
 
     /* type checks (sort of Boolean operation) */
@@ -100,20 +102,23 @@ public class Procedure extends ImmutableValue {
     /* function call */
 
     @Override
-    public Value call(final State state, final List<Expr> args, final Expr listArg) throws SetlException {
+    public Value call(final State state, List<Value> argumentValues, final FragmentList<OperatorExpression> arguments, final Value listValue, final OperatorExpression listArg) throws SetlException {
         final SetlObject object = this.object;
         this.object = null;
 
         SetlList listArguments = null;
-        if (listArg != null) {
-            Value listArgument = listArg.eval(state);
-            if (listArgument.getClass() != SetlList.class) {
-                throw new UndefinedOperationException("List argument '" + listArg.toString(state) + "' is not a list.");
+        if (listValue != null) {
+            if (listValue.getClass() != SetlList.class) {
+                StringBuilder error = new StringBuilder();
+                error.append("List argument '");
+                listValue.appendString(state, error, 0);
+                error.append("' is not a list.");
+                throw new UndefinedOperationException(error.toString());
             }
-            listArguments = (SetlList) listArgument;
+            listArguments = (SetlList) listValue;
         }
 
-        int nArguments = args.size();
+        int nArguments = argumentValues.size();
         if (listArguments != null) {
             nArguments += listArguments.size();
         }
@@ -128,17 +133,15 @@ public class Procedure extends ImmutableValue {
         }
 
         // evaluate arguments
-        final ArrayList<Value> values = new ArrayList<Value>(nArguments);
-        for (final Expr arg : args) {
-            values.add(arg.eval(state));
-        }
+        final ArrayList<Value> values = new ArrayList<>(nArguments);
+        values.addAll(argumentValues);
         if (listArguments != null) {
             for (Value listArgument : listArguments) {
                 values.add(listArgument);
             }
         }
 
-        return callAfterEval(state, args, values, object);
+        return callAfterEval(state, arguments, values, object);
     }
 
     /**
@@ -152,7 +155,7 @@ public class Procedure extends ImmutableValue {
      * @return               Return value of this function call.
      * @throws SetlException Thrown in case of some (user-) error.
      */
-    protected Value callAfterEval(final State state, final List<Expr> args, final List<Value> values, final SetlObject object) throws SetlException {
+    protected Value callAfterEval(final State state, final FragmentList<OperatorExpression> args, final List<Value> values, final SetlObject object) throws SetlException {
         // save old scope
         final VariableScope oldScope = state.getScope();
         // create new scope used for the function call
@@ -205,9 +208,16 @@ public class Procedure extends ImmutableValue {
 
     @Override
     public void appendString(final State state, final StringBuilder sb, final int tabs) {
+        final String endl      = state.getEndl();
         appendStringWithoutStatements(state, sb);
         sb.append(" ");
-        statements.appendString(state, sb, tabs, /* brackets = */ true);
+        sb.append("{");
+        sb.append(endl);
+        appendBeforeStatements(state, sb, tabs + 1);
+        statements.appendString(state, sb, tabs + 1, /* brackets = */ false);
+        sb.append(endl);
+        state.appendLineStart(sb, tabs);
+        sb.append("}");
     }
 
     /**
@@ -224,6 +234,21 @@ public class Procedure extends ImmutableValue {
         sb.append("procedure(");
         parameters.appendString(state, sb);
         sb.append(")");
+    }
+
+
+    /**
+     * Appends something before printing the statements of this Procedure to the given
+     * StringBuilder object.
+     *
+     * @see org.randoom.setlx.utilities.CodeFragment#toString(State)
+     *
+     * @param state Current state of the running setlX program.
+     * @param sb    StringBuilder to append to.
+     * @param tabs  Number of tabs to use as indentation for statements.
+     */
+    protected void appendBeforeStatements(State state, StringBuilder sb, int tabs) {
+        // append nothing by default
     }
 
     /* term operations */
@@ -253,7 +278,7 @@ public class Procedure extends ImmutableValue {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
             final ParameterList parameters = ParameterList.termFragmentToParameterList(state, term.firstMember());
-            final Block         block      = TermConverter.valueToBlock(state, term.lastMember());
+            final Block         block      = TermUtilities.valueToBlock(state, term.lastMember());
             return new Procedure(parameters, block);
         }
     }

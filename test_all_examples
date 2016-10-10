@@ -6,6 +6,7 @@ tmpFile=$(mktemp -t setlx-XXXXXXXXXX)
 
 # set overrides for setlX launcher script
 export OVERRIDE_setlXJarDirectory="$PWD/interpreter/"
+export SETLX_LIBRARY_PATH="$PWD/interpreter/setlXlibrary"
 export OVERRIDE_setlXjavaParameters="-d64 -Xmx6144m"
 #export OVERRIDE_setlXjavaParameters="-d32 -Xmx3000m"
 
@@ -19,21 +20,19 @@ exampleDirs=("example_SetlX_code" "Tutorial/Examples")
 renice -n 10 $$
 
 # prepare the interpreter
-simpleTest="interpreter/simpleTests/core/test.stlx"
-cd interpreter; ant -emacs -logger org.apache.tools.ant.NoBannerLogger test >"$tmpFile" 2>&1; cd ..
+cd interpreter; ./runIntegrationTests >"$tmpFile" 2>&1; cd ..
 
-# check for failed tests
-failedCount=$(grep -c "failed" "$tmpFile")
-everythingOkCount=$(grep -c "Everything is fine. Move along sir!" "$tmpFile")
+# check if tests went fine
+everythingOkCount=$(grep -c "Every test is fine. Move along sir!" "$tmpFile")
 
 # alert the user and stop
-if [ $failedCount -gt 0 -o $everythingOkCount -ne 1 ]
+if [ $everythingOkCount -ne 1 ]
   then
-    echo "The initial testfile '$simpleTest' failed!"
+    echo "The initial integration tests failed!"
     rm -f "$tmpFile"
     exit 1
 else
-    echo -e "Test of file '$simpleTest' successful!\n"
+    echo -e "Integration Test successful!\n"
 fi
 
 # number of concurrent processes to start
@@ -54,7 +53,7 @@ if [ "$numberOfThreads" -lt 1 ]
     numberOfThreads="1"
 fi
 
-rm -f diff.*.result
+rm -f test_failure.*.result
 
 # discover all example files
 examples=()
@@ -159,7 +158,9 @@ for path in "${examplesAutomaticTest[@]}"
 
                         failedTests=("${failedTests[@]}" "${pathnames[$i]}")
 
-                        mv "$tmpFile" "$diffDir/diff.${filenames[$i]}.result"
+                        outputName="test_failure.${pathnames[$i]}.result"
+                        outputName="${outputName//\//.}"
+                        mv "$tmpFile" "$diffDir/$outputName"
                         message="${messages[$i]} failed ... (see diff.${filenames[$i]}.result)\n"
 
                     else
@@ -202,10 +203,14 @@ if [ "${#failedTests[@]}" -gt "0" ]
     done
     echo
     echo "!! ${#failedTests[@]} examples did fail this test !!"
+    echo
+    "$setlXlaunchScript" --version
     exit 1
 else
     echo
     echo "Everything is fabulous. Well done sir!"
+    echo
+    "$setlXlaunchScript" --version
     exit 0
 fi
 

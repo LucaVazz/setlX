@@ -1,13 +1,13 @@
 package org.randoom.setlx.functions;
 
 import org.randoom.setlx.exceptions.IncompatibleTypeException;
-import org.randoom.setlx.expressions.Variable;
+import org.randoom.setlx.parameters.ParameterDefinition;
 import org.randoom.setlx.types.SetlList;
 import org.randoom.setlx.types.SetlString;
 import org.randoom.setlx.types.Term;
 import org.randoom.setlx.types.Value;
-import org.randoom.setlx.utilities.ParameterDef;
 import org.randoom.setlx.utilities.State;
+import org.randoom.setlx.utilities.TermUtilities;
 
 import java.util.HashMap;
 
@@ -16,8 +16,8 @@ import java.util.HashMap;
  */
 public class PD_makeTerm extends PreDefinedProcedure {
 
-    private final static ParameterDef        FUNCTIONAL_CHARACTER = createParameter("functionalCharacter");
-    private final static ParameterDef        BODY                 = createParameter("body");
+    private final static ParameterDefinition FUNCTIONAL_CHARACTER = createParameter("functionalCharacter");
+    private final static ParameterDefinition BODY                 = createParameter("body");
 
     /** Definition of the PreDefinedProcedure `makeTerm'. */
     public  final static PreDefinedProcedure DEFINITION           = new PD_makeTerm();
@@ -29,7 +29,7 @@ public class PD_makeTerm extends PreDefinedProcedure {
     }
 
     @Override
-    public Value execute(final State state, final HashMap<ParameterDef, Value> args) throws IncompatibleTypeException {
+    public Value execute(final State state, final HashMap<ParameterDefinition, Value> args) throws IncompatibleTypeException {
         final Value arg0 = args.get(FUNCTIONAL_CHARACTER);
         final Value arg1 = args.get(BODY);
         if ( ! (arg0 instanceof SetlString)) {
@@ -44,19 +44,17 @@ public class PD_makeTerm extends PreDefinedProcedure {
         }
         String fct = arg0.getUnquotedString(state);
 
-        // check if name is usable as term (fist char is upper case or single quote ( ' ))
-        if (fct.length() > 0 && (fct.charAt(0) == '^' || Character.isUpperCase(fct.charAt(0)))) {
-            // use correct internal representation when user wants to create a variable
-            if (fct.equals(Variable.getFunctionalCharacterExternal())) {
-                fct = Variable.getFunctionalCharacter();
-            }
-            // make the new Term
-            return new Term(fct, (SetlList) arg1);
-        } else {
-            throw new IncompatibleTypeException(
-                "FunctionalCharacter '" + fct + "' must start with an upper case letter or a hat ('^')."
-            );
+        if (! fct.startsWith(TermUtilities.getFunctionalCharacterPrefix())) {
+            fct = TermUtilities.getFunctionalCharacterPrefix() + fct;
         }
+
+        if (TermUtilities.isInternalFunctionalCharacter(fct) || TermUtilities.isFunctionalCharacter(fct)) {
+            return new Term(fct, (SetlList) arg1);
+        }
+
+        throw new IncompatibleTypeException(
+                "FunctionalCharacter '" + fct + "' must start with one or three hats ('" + TermUtilities.getFunctionalCharacterPrefix() + "' or '" + TermUtilities.getPrefixOfInternalFunctionalCharacters() + "')."
+        );
     }
 }
 

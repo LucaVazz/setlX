@@ -30,7 +30,7 @@ import java.util.List;
  */
 public class TryCatch extends Statement {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(TryCatch.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(TryCatch.class);
 
     private final Block                                blockToTry;
     private final FragmentList<AbstractTryCatchBranch> tryList;
@@ -42,8 +42,8 @@ public class TryCatch extends Statement {
      * @param tryList    List of catch branches.
      */
     public TryCatch(final Block blockToTry, final FragmentList<AbstractTryCatchBranch> tryList) {
-        this.blockToTry = unify(blockToTry);
-        this.tryList    = unify(tryList);
+        this.blockToTry = blockToTry;
+        this.tryList    = tryList;
     }
 
     @Override
@@ -62,7 +62,7 @@ public class TryCatch extends Statement {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
@@ -77,6 +77,7 @@ public class TryCatch extends Statement {
         while (boundVariables.size() > preBound) {
             boundVariables.remove(boundVariables.size() - 1);
         }
+        return false;
     }
 
     /* string operations */
@@ -120,7 +121,7 @@ public class TryCatch extends Statement {
         if (term.size() != 2 || ! (term.lastMember() instanceof SetlList)) {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
-            final Block                                block      = TermConverter.valueToBlock(state, term.firstMember());
+            final Block                                block      = TermUtilities.valueToBlock(state, term.firstMember());
             final SetlList                             branches   = (SetlList) term.lastMember();
             final FragmentList<AbstractTryCatchBranch> branchList = new FragmentList<AbstractTryCatchBranch>(branches.size());
             for (final Value v : branches) {

@@ -2,7 +2,7 @@ package org.randoom.setlx.statements;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.statementBranches.AbstractMatchBranch;
 import org.randoom.setlx.statementBranches.MatchDefaultBranch;
 import org.randoom.setlx.types.SetlList;
@@ -28,9 +28,9 @@ import java.util.List;
  */
 public class Match extends Statement {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(Match.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(Match.class);
 
-    private final Expr                              expr;
+    private final OperatorExpression expr;
     private final FragmentList<AbstractMatchBranch> branchList;
 
     /**
@@ -39,21 +39,21 @@ public class Match extends Statement {
      * @param expr       Expression forming the term to match.
      * @param branchList List of match branches.
      */
-    public Match(final Expr expr, final FragmentList<AbstractMatchBranch> branchList) {
+    public Match(final OperatorExpression expr, final FragmentList<AbstractMatchBranch> branchList) {
         this.expr       = unify(expr);
-        this.branchList = unify(branchList);
+        this.branchList = branchList;
     }
 
     @Override
     public ReturnMessage execute(final State state) throws SetlException {
-        final Value         term       = expr.eval(state).toTerm(state);
+        final Value         term       = expr.evaluate(state).toTerm(state);
         final VariableScope outerScope = state.getScope();
         try {
             for (final AbstractMatchBranch br : branchList) {
                 final MatchResult result = br.matches(state, term);
                 if (result.isMatch()) {
                     // scope for execution
-                    final VariableScope innerScope = outerScope.createInteratorBlock();
+                    final VariableScope innerScope = outerScope.createIteratorBlock();
                     state.setScope(innerScope);
 
                     // force match variables to be local to this block
@@ -89,7 +89,7 @@ public class Match extends Statement {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
@@ -112,9 +112,10 @@ public class Match extends Statement {
                 boundHere.retainAll(boundTmp.subList(preBound, boundTmp.size()));
             }
         }
-        if (branchList.get(branchList.size() - 1) instanceof MatchDefaultBranch) {
+        if (boundHere != null && branchList.get(branchList.size() - 1) instanceof MatchDefaultBranch) {
             boundVariables.addAll(boundHere);
         }
+        return false;
     }
 
     /* string operations */
@@ -162,7 +163,7 @@ public class Match extends Statement {
         if (term.size() != 2 || ! (term.lastMember() instanceof SetlList)) {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
-            final Expr                              expr       = TermConverter.valueToExpr(state, term.firstMember());
+            final OperatorExpression                expr       = OperatorExpression.createFromTerm(state, term.firstMember());
             final SetlList                          branches   = (SetlList) term.lastMember();
             final FragmentList<AbstractMatchBranch> branchList = new FragmentList<AbstractMatchBranch>(branches.size());
             for (final Value v : branches) {

@@ -3,13 +3,16 @@ package org.randoom.setlx.functions;
 import org.randoom.setlx.exceptions.IncorrectNumberOfParametersException;
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
-import org.randoom.setlx.expressions.Expr;
-import org.randoom.setlx.expressions.ValueExpr;
-import org.randoom.setlx.expressions.Variable;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
+import org.randoom.setlx.operators.ValueOperator;
+import org.randoom.setlx.parameters.ListParameter;
+import org.randoom.setlx.parameters.Parameter;
+import org.randoom.setlx.parameters.ParameterDefinition;
+import org.randoom.setlx.parameters.ParameterList;
+import org.randoom.setlx.parameters.ReadWriteParameter;
 import org.randoom.setlx.statements.Block;
 import org.randoom.setlx.types.*;
 import org.randoom.setlx.utilities.*;
-import org.randoom.setlx.utilities.ParameterDef.ParameterType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,9 +21,10 @@ import java.util.List;
 /**
  * Base class for all procedures, which can be loaded at runtime by setlX.
  */
+@SuppressWarnings("AbstractClassExtendsConcreteClass")
 public abstract class PreDefinedProcedure extends Procedure {
     // functional characters used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(PreDefinedProcedure.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(PreDefinedProcedure.class);
 
     private String name;
 
@@ -65,8 +69,8 @@ public abstract class PreDefinedProcedure extends Procedure {
      * @param param Parameter name.
      * @return new ParameterDef
      */
-    protected static ParameterDef createParameter(final String param) {
-        return new ParameterDef(new Variable(param), ParameterType.READ_ONLY);
+    protected static Parameter createParameter(final String param) {
+        return new Parameter(param);
     }
 
     /**
@@ -75,8 +79,8 @@ public abstract class PreDefinedProcedure extends Procedure {
      * @param param Parameter name.
      * @return new ParameterDef
      */
-    protected static ParameterDef createRwParameter(final String param) {
-        return new ParameterDef(new Variable(param), ParameterType.READ_WRITE);
+    protected static ReadWriteParameter createRwParameter(final String param) {
+        return new ReadWriteParameter(param);
     }
 
     /**
@@ -86,8 +90,8 @@ public abstract class PreDefinedProcedure extends Procedure {
      * @param defaultValue Value to use as default.
      * @return new ParameterDef
      */
-    protected static ParameterDef createOptionalParameter(final String param, final Value defaultValue) {
-        return new ParameterDef(new Variable(param), ParameterType.READ_ONLY, new ValueExpr(defaultValue));
+    protected static Parameter createOptionalParameter(final String param, final Value defaultValue) {
+        return new Parameter(param, new OperatorExpression(new ValueOperator(defaultValue)));
     }
 
     /**
@@ -96,8 +100,8 @@ public abstract class PreDefinedProcedure extends Procedure {
      * @param param Parameter name.
      * @return new ParameterDef
      */
-    protected static ParameterDef createListParameter(final String param) {
-        return new ParameterDef(new Variable(param), ParameterType.LIST);
+    protected static ListParameter createListParameter(final String param) {
+        return new ListParameter(param);
     }
 
     /**
@@ -105,7 +109,7 @@ public abstract class PreDefinedProcedure extends Procedure {
      *
      * @param parameter Parameter to add.
      */
-    protected final void addParameter(final ParameterDef parameter) {
+    protected final void addParameter(final ParameterDefinition parameter) {
         parameters.add(parameter);
     }
 
@@ -117,21 +121,24 @@ public abstract class PreDefinedProcedure extends Procedure {
      * @return               Resulting value of the call.
      * @throws SetlException Can be thrown in case of some (user-) error.
      */
-    protected abstract Value execute(final State state, final HashMap<ParameterDef, Value> args) throws SetlException;
+    protected abstract Value execute(final State state, final HashMap<ParameterDefinition, Value> args) throws SetlException;
 
     // this function is called from within SetlX
     @Override
-    public final Value call(final State state, final List<Expr> args, final Expr listArg) throws SetlException {
+    public final Value call(final State state, List<Value> argumentValues, final FragmentList<OperatorExpression> arguments, final Value listValue, final OperatorExpression listArg) throws SetlException {
         SetlList listArguments = null;
-        if (listArg != null) {
-            Value listArgument = listArg.eval(state);
-            if (listArgument.getClass() != SetlList.class) {
-                throw new UndefinedOperationException("List argument '" + listArg.toString(state) + "' is not a list.");
+        if (listValue != null) {
+            if (listValue.getClass() != SetlList.class) {
+                StringBuilder error = new StringBuilder();
+                error.append("List argument '");
+                listValue.appendString(state, error, 0);
+                error.append("' is not a list.");
+                throw new UndefinedOperationException(error.toString());
             }
-            listArguments = (SetlList) listArgument;
+            listArguments = (SetlList) listValue;
         }
 
-        int nArguments = args.size();
+        int nArguments = argumentValues.size();
         if (listArguments != null) {
             nArguments += listArguments.size();
         }
@@ -148,10 +155,8 @@ public abstract class PreDefinedProcedure extends Procedure {
         }
 
         // evaluate arguments
-        final ArrayList<Value> values = new ArrayList<Value>(nArguments);
-        for (final Expr arg : args) {
-            values.add(arg.eval(state).clone());
-        }
+        final ArrayList<Value> values = new ArrayList<>(nArguments);
+        values.addAll(argumentValues);
         if (listArguments != null) {
             for (Value listArgument : listArguments) {
                 values.add(listArgument);
@@ -159,13 +164,13 @@ public abstract class PreDefinedProcedure extends Procedure {
         }
 
         // assign parameters
-        HashMap<ParameterDef, Value> assignments = parameters.putParameterValuesIntoMap(state, values);
+        HashMap<ParameterDefinition, Value> assignments = parameters.putParameterValuesIntoMap(state, values);
 
         // call predefined function (which may add writeBack-values to List)
         final Value result  = this.execute(state, assignments);
 
         // extract 'rw' arguments from writeBackVars list and store them into WriteBackAgent
-        final WriteBackAgent wba = parameters.extractRwParametersFromMap(assignments, args);
+        final WriteBackAgent wba = parameters.extractRwParametersFromMap(assignments, arguments);
         if (wba != null) {
             // assign variables
             wba.writeBack(state, FUNCTIONAL_CHARACTER);

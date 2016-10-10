@@ -2,19 +2,24 @@ package org.randoom.setlx.functions;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
+import org.randoom.setlx.plot.types.Canvas;
+import org.randoom.setlx.plot.utilities.ConnectJFreeChart;
+import org.randoom.setlx.plot.utilities.ConvertSetlTypes;
+import org.randoom.setlx.parameters.ParameterDefinition;
+import org.randoom.setlx.plot.utilities.PlotCheckType;
+import org.randoom.setlx.utilities.State;
 import org.randoom.setlx.types.SetlList;
 import org.randoom.setlx.types.SetlString;
 import org.randoom.setlx.types.Value;
-import org.randoom.setlx.utilities.*;
 
 import java.util.HashMap;
 import java.util.List;
 
 public class PD_plot_addLabel extends PreDefinedProcedure {
 
-    private final static ParameterDef CANVAS = createParameter("canvas");
-    private final static ParameterDef XYTUPEL = createParameter("XYTupel");
-    private final static ParameterDef LABEL = createParameter("Label");
+    private final static ParameterDefinition CANVAS = createParameter("canvas");
+    private final static ParameterDefinition XYTUPEL = createParameter("XYTupel");
+    private final static ParameterDefinition LABEL = createParameter("Label");
     public final static PreDefinedProcedure DEFINITION = new PD_plot_addLabel();
 
     private PD_plot_addLabel() {
@@ -25,7 +30,7 @@ public class PD_plot_addLabel extends PreDefinedProcedure {
     }
 
     @Override
-    protected Value execute(State state, HashMap<ParameterDef, Value> args) throws SetlException {
+    protected Value execute(State state, HashMap<ParameterDefinition, Value> args) throws SetlException {
 
         if(!PlotCheckType.isCanvas(args.get(CANVAS))){
             throw new UndefinedOperationException("First parameter has to be a Canvas object");
@@ -50,7 +55,7 @@ public class PD_plot_addLabel extends PreDefinedProcedure {
             throw new UndefinedOperationException("Second parameter has to be a Tupel of Numbers (eq: [1,2]) ");
         }
 
-        List<Double> list = ConvertSetlTypes.convertSetlListAsDouble(xyTupel);
+        List<Double> list = ConvertSetlTypes.convertSetlListToListOfDouble(xyTupel, state);
         SetlString label = (SetlString)args.get(LABEL);
         String stringLabel = label.toString().replace("\"", "");
 

@@ -5,6 +5,7 @@ import org.randoom.setlx.exceptions.IncompatibleTypeException;
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
 import org.randoom.setlx.utilities.CodeFragment;
+import org.randoom.setlx.utilities.FixedSingularValueDecomposition;
 import org.randoom.setlx.utilities.MatchResult;
 import org.randoom.setlx.utilities.State;
 
@@ -166,12 +167,12 @@ public class SetlMatrix extends IndexedCollectionValue {
     public SetlVector toVector() throws IncompatibleTypeException, UndefinedOperationException {
         ArrayList<Double> values;
         if(matrix.getColumnDimension() == 1) {
-            values = new ArrayList<Double>(matrix.getRowDimension());
+            values = new ArrayList<>(matrix.getRowDimension());
             for(int i = 0; i < matrix.getRowDimension(); i++) {
                 values.add(matrix.getArray()[i][0]);
             }
         } else if(matrix.getRowDimension() == 1) {
-            values = new ArrayList<Double>(matrix.getColumnDimension());
+            values = new ArrayList<>(matrix.getColumnDimension());
             for(int i = 0; i < matrix.getColumnDimension(); i++) {
                 values.add(matrix.getArray()[0][i]);
             }
@@ -189,7 +190,7 @@ public class SetlMatrix extends IndexedCollectionValue {
     private SetlList toVectorList() {
         SetlList container = new SetlList(this.matrix.getRowDimension());
         for(double[] row : this.matrix.getArray()) {
-            ArrayList<Double> vector = new ArrayList<Double>();
+            ArrayList<Double> vector = new ArrayList<>();
             for (double v : row) {
                 vector.add(v);
             }
@@ -456,11 +457,11 @@ public class SetlMatrix extends IndexedCollectionValue {
         if(index > this.matrix.getRowDimension() || index < 1) {
             throw new IncompatibleTypeException("Index out of bounds: " + index);
         }
-        SetlList container = new SetlList(this.matrix.getColumnDimension());
+        ArrayList<Double> container = new ArrayList<>(this.matrix.getColumnDimension());
         for(double d : this.matrix.getArray()[index - 1]) {
-            container.addMember(null, SetlDouble.valueOf(d));
+            container.add(d);
         }
-        return container;
+        return new SetlVector(container);
     }
 
     @Override
@@ -568,33 +569,37 @@ public class SetlMatrix extends IndexedCollectionValue {
     }
 
     @Override
-    public void setMember(final State state, final Value index, final Value v) throws SetlException {
+    public void setMember(final State state, final Value index, final Value value) throws SetlException {
         if(index.jIntConvertible()) {
-            int idx = index.jIntValue();
-            if(idx > this.matrix.getRowDimension() || idx < 1) {
-                throw new IncompatibleTypeException("Index out of bounds: " + idx);
-            }
-            if(v instanceof CollectionValue) {
-                CollectionValue col = (CollectionValue)v;
-                if(col.size() != this.matrix.getColumnDimension()) {
-                    throw new IncompatibleTypeException("The collection and a row of this matrix have different numbers of elements.");
-                }
-                List<Double> newRow = new ArrayList<Double>(col.size());
-                for(Value elem : col) {
-                    if(elem.jDoubleConvertible()) {
-                        newRow.add(elem.jDoubleValue());
-                    } else {
-                        throw new IncompatibleTypeException("Matrix row assign: Element " + elem + " of the collection is not a number.");
-                    }
-                }
-                for(int i = 0; i < newRow.size(); i++) {
-                    this.matrix.set(idx, i, newRow.get(i));
-                }
-            } else {
-                throw new IncompatibleTypeException("Argument " + v + " to replace matrix row " + idx + " is not a collection.");
-            }
+            setMember(state, index.jIntValue(), value);
         } else {
             throw new IncompatibleTypeException("Matrix row access index must be an integer.");
+        }
+    }
+
+    @Override
+    public void setMember(final State state, int index, final Value value) throws SetlException {
+        if(index > this.matrix.getRowDimension() || index < 1) {
+            throw new IncompatibleTypeException("Index out of bounds: " + index);
+        }
+        if(value instanceof CollectionValue) {
+            CollectionValue col = (CollectionValue) value;
+            if(col.size() != this.matrix.getColumnDimension()) {
+                throw new IncompatibleTypeException("The collection and a row of this matrix have different numbers of elements.");
+            }
+            List<Double> newRow = new ArrayList<>(col.size());
+            for(Value elem : col) {
+                if(elem.jDoubleConvertible()) {
+                    newRow.add(elem.jDoubleValue());
+                } else {
+                    throw new IncompatibleTypeException("Matrix row assign: Element " + elem + " of the collection is not a number.");
+                }
+            }
+            for(int i = 0; i < newRow.size(); i++) {
+                this.matrix.set(index, i, newRow.get(i));
+            }
+        } else {
+            throw new IncompatibleTypeException("Argument " + value + " to replace matrix row " + index + " is not a collection.");
         }
     }
 
@@ -641,9 +646,9 @@ public class SetlMatrix extends IndexedCollectionValue {
         int n = matrix.length;
         SetlList vectors = new SetlList(n);
         for (int column = 0; column < n; column++) {
-            ArrayList<Double> vector = new ArrayList<Double>(n);
-            for (int row = 0; row < n; row++) {
-                vector.add(matrix[row][column]);
+            ArrayList<Double> vector = new ArrayList<>(n);
+            for (double[] aMatrix : matrix) {
+                vector.add(aMatrix[column]);
             }
             vectors.addMember(state, new SetlVector(vector));
         }
@@ -686,13 +691,7 @@ public class SetlMatrix extends IndexedCollectionValue {
         return result;
     }
 
-    /**
-     * Compute inverse of this matrix
-     *
-     * @return Inverse of this matrix
-     * @throws UndefinedOperationException in case the matrix is not square.
-     */
-    public SetlMatrix inverse() throws UndefinedOperationException {
+    private SetlMatrix inverse() throws UndefinedOperationException {
         if (! isSquare()) {
             throw new UndefinedOperationException(
                     "Matrix must be square to compute inverse."
@@ -727,12 +726,7 @@ public class SetlMatrix extends IndexedCollectionValue {
         }
     }
 
-    /**
-     * Is the number of rows equal to the number of columns
-     *
-     * @return boolean
-     */
-    public boolean isSquare() {
+    private boolean isSquare() {
         return this.matrix.getColumnDimension() == this.matrix.getRowDimension();
     }
 
@@ -743,7 +737,7 @@ public class SetlMatrix extends IndexedCollectionValue {
      * @return 3-tuple of matrices [U, S, V]
      */
     public SetlList singularValueDecomposition(State state) {
-        SingularValueDecomposition result = this.matrix.svd();
+        FixedSingularValueDecomposition result = new FixedSingularValueDecomposition(this.matrix.svd());
         SetlList container = new SetlList();
         container.addMember(state, new SetlMatrix(result.getU()));
         container.addMember(state, new SetlMatrix(result.getS()));
@@ -769,11 +763,8 @@ public class SetlMatrix extends IndexedCollectionValue {
             } else {
                 return result;
             }
-        } catch (RuntimeException re) {
+        } catch (RuntimeException | IncompatibleTypeException re) {
             throw new UndefinedOperationException("Error during solve: " + re.getMessage(), re);
-        } catch (IncompatibleTypeException ite) {
-            // this should be impossible
-            throw new UndefinedOperationException("Error during solve: " + ite.getMessage(), ite);
         }
     }
 
@@ -782,7 +773,7 @@ public class SetlMatrix extends IndexedCollectionValue {
      *
      * @return transposed matrix
      */
-    public SetlMatrix transpose() {
+    /*package*/ SetlMatrix transpose() {
         return new SetlMatrix(this.matrix.transpose());
     }
 

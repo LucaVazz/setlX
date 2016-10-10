@@ -1,13 +1,14 @@
 package org.randoom.setlx.statementBranches;
 
+import org.randoom.setlx.assignments.AssignableVariable;
 import org.randoom.setlx.exceptions.CatchableInSetlXException;
 import org.randoom.setlx.exceptions.TermConversionException;
 import org.randoom.setlx.exceptions.ThrownInSetlXException;
-import org.randoom.setlx.expressions.Variable;
+import org.randoom.setlx.assignments.AAssignableExpression;
 import org.randoom.setlx.statements.Block;
 import org.randoom.setlx.types.Term;
 import org.randoom.setlx.utilities.State;
-import org.randoom.setlx.utilities.TermConverter;
+import org.randoom.setlx.utilities.TermUtilities;
 
 /**
  * This catchUsr block catches any exception, which was user created, e.g.
@@ -25,7 +26,7 @@ import org.randoom.setlx.utilities.TermConverter;
  */
 public class TryCatchUsrBranch extends AbstractTryCatchBranch {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(TryCatchUsrBranch.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(TryCatchUsrBranch.class);
 
     /**
      * Create new catchUsr-branch.
@@ -33,7 +34,7 @@ public class TryCatchUsrBranch extends AbstractTryCatchBranch {
      * @param errorVar       Variable to bind caught exception to.
      * @param blockToRecover Statements to execute when exception is caught.
      */
-    public TryCatchUsrBranch(final Variable errorVar, final Block blockToRecover){
+    public TryCatchUsrBranch(final AssignableVariable errorVar, final Block blockToRecover){
         super(errorVar, blockToRecover);
     }
 
@@ -68,13 +69,14 @@ public class TryCatchUsrBranch extends AbstractTryCatchBranch {
      * @throws TermConversionException Thrown in case of a malformed term.
      */
     public static TryCatchUsrBranch termToBranch(final State state, final Term term) throws TermConversionException {
-        if (term.size() != 2 || term.firstMember().getClass() != Term.class) {
-            throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
-        } else {
-            final Variable var   = Variable.termToExpr(state, (Term) term.firstMember());
-            final Block    block = TermConverter.valueToBlock(state, term.lastMember());
-            return new TryCatchUsrBranch(var, block);
+        if (term.size() == 2) {
+            final AAssignableExpression var = TermUtilities.valueToAssignableExpr(state, term.firstMember());
+            final Block block = TermUtilities.valueToBlock(state, term.lastMember());
+            if (var.getClass() == AssignableVariable.class) {
+                return new TryCatchUsrBranch((AssignableVariable) var, block);
+            }
         }
+        throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
     }
 
     /* comparisons */

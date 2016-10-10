@@ -2,16 +2,20 @@ package org.randoom.setlx.functions;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
+import org.randoom.setlx.plot.types.Canvas;
+import org.randoom.setlx.plot.utilities.ConnectJFreeChart;
+import org.randoom.setlx.parameters.ParameterDefinition;
+import org.randoom.setlx.plot.utilities.PlotCheckType;
+import org.randoom.setlx.utilities.State;
 import org.randoom.setlx.types.SetlString;
 import org.randoom.setlx.types.Value;
-import org.randoom.setlx.utilities.*;
 
 import java.util.HashMap;
 
 public class PD_plot_exportCanvas extends PreDefinedProcedure {
 
-    private final static ParameterDef CANVAS = createParameter("canvas");
-    private final static ParameterDef PATH = createParameter("path");
+    private final static ParameterDefinition CANVAS = createParameter("canvas");
+    private final static ParameterDefinition PATH = createParameter("path");
     public final static PreDefinedProcedure DEFINITION = new PD_plot_exportCanvas();
 
     private PD_plot_exportCanvas() {
@@ -21,7 +25,7 @@ public class PD_plot_exportCanvas extends PreDefinedProcedure {
     }
 
     @Override
-    protected Value execute(State state, HashMap<ParameterDef, Value> args) throws SetlException {
+    protected Value execute(State state, HashMap<ParameterDefinition, Value> args) throws SetlException {
         if(!PlotCheckType.isCanvas(args.get(CANVAS))){
             throw new UndefinedOperationException("First parameter has to be of object Canvas");
         }
@@ -32,7 +36,7 @@ public class PD_plot_exportCanvas extends PreDefinedProcedure {
 
         Canvas canvas = (Canvas)args.get(CANVAS);
         SetlString path = (SetlString)args.get(PATH);
-        String pathString = path.toString().replace("\"", "");
+        String pathString = state.filterFileName(path.getUnquotedString(state));
         ConnectJFreeChart.getInstance().exportCanvas(canvas, pathString);
         return new SetlString("Exported Canvas to "+pathString);
     }

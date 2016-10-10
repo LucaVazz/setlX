@@ -1,8 +1,9 @@
 package org.randoom.setlx.utilities;
 
 import org.randoom.setlx.exceptions.SetlException;
-import org.randoom.setlx.expressions.AssignableExpression;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.exceptions.UndefinedOperationException;
+import org.randoom.setlx.assignments.AAssignableExpression;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.types.Value;
 
 import java.util.ArrayList;
@@ -13,8 +14,8 @@ import java.util.List;
  */
 public class WriteBackAgent {
 
-    private final List<AssignableExpression> expressions;
-    private final List<Value>                values;
+    private final List<OperatorExpression> expressions;
+    private final List<Value> values;
 
     /**
      * Create a new write-back-agent object.
@@ -22,7 +23,7 @@ public class WriteBackAgent {
      * @param size Number of write-back values used.
      */
     public WriteBackAgent(final int size) {
-        this.expressions = new ArrayList<AssignableExpression>(size);
+        this.expressions = new ArrayList<OperatorExpression>(size);
         this.values      = new ArrayList<Value>(size);
     }
 
@@ -31,16 +32,10 @@ public class WriteBackAgent {
      *
      * @param expression Expression to assign to.
      * @param value      Value to assign.
-     * @return           True if expression is assignable.
      */
-    public boolean add(final Expr expression, final Value value) {
-        if (expression instanceof AssignableExpression) {
-            this.expressions.add((AssignableExpression) expression);
-            this.values.add(value);
-            return true;
-        } else {
-            return false;
-        }
+    public void add(final OperatorExpression expression, final Value value) {
+        this.expressions.add(expression);
+        this.values.add(value);
     }
 
     /**
@@ -61,7 +56,8 @@ public class WriteBackAgent {
         final int size = expressions.size();
         for (int i = 0; i < size; ++i) {
             try {
-                expressions.get(i).assign(state, values.get(i).clone(), context);
+                AAssignableExpression expression = expressions.get(i).convertToAssignable();
+                expression.assignUncloned(state, values.get(i).clone(), context);
             } catch (final SetlException se) {
                 // assignment failed => just ignore it
             }

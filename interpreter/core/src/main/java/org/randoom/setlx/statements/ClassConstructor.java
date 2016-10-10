@@ -9,7 +9,7 @@ import org.randoom.setlx.types.Value;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.ReturnMessage;
 import org.randoom.setlx.utilities.State;
-import org.randoom.setlx.utilities.TermConverter;
+import org.randoom.setlx.utilities.TermUtilities;
 
 import java.util.List;
 
@@ -28,7 +28,7 @@ import java.util.List;
  */
 public class ClassConstructor extends Statement {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(ClassConstructor.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(ClassConstructor.class);
 
     private final String    name;
     private final SetlClass classDefinition;
@@ -51,14 +51,14 @@ public class ClassConstructor extends Statement {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
     ) {
         boundVariables.add(name);
-        classDefinition.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
+        return classDefinition.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
     }
 
     /* string operations */
@@ -94,7 +94,7 @@ public class ClassConstructor extends Statement {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
             final String name            = term.firstMember().getUnquotedString(state);
-            final Value  classDefinition = TermConverter.valueTermToValue(state, term.lastMember());
+            final Value  classDefinition = Value.createFromTerm(state, term.lastMember());
             if (classDefinition instanceof SetlClass) {
                 return new ClassConstructor(name, (SetlClass) classDefinition);
             } else {

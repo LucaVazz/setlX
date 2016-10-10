@@ -2,8 +2,16 @@ package org.randoom.setlx.functions;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
-import org.randoom.setlx.types.*;
-import org.randoom.setlx.utilities.*;
+import org.randoom.setlx.plot.types.Canvas;
+import org.randoom.setlx.plot.utilities.ConnectJFreeChart;
+import org.randoom.setlx.plot.utilities.ConvertSetlTypes;
+import org.randoom.setlx.plot.utilities.PlotCheckType;
+import org.randoom.setlx.types.Rational;
+import org.randoom.setlx.types.SetlDouble;
+import org.randoom.setlx.types.SetlList;
+import org.randoom.setlx.types.Value;
+import org.randoom.setlx.parameters.ParameterDefinition;
+import org.randoom.setlx.utilities.State;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,10 +19,10 @@ import java.util.List;
 
 public class PD_plot_addBullets extends PreDefinedProcedure {
 
-    private final static ParameterDef CANVAS = createParameter("canvas");
-    private final static ParameterDef XYTUPEL = createParameter("xyTupel");
-    private final static ParameterDef RGBLIST = createOptionalParameter("RGBList", Rational.ONE);
-    private final static ParameterDef BULLETSIZE = createOptionalParameter("Bulletsize", SetlDouble.FIVE);
+    private final static ParameterDefinition CANVAS = createParameter("canvas");
+    private final static ParameterDefinition XYTUPEL = createParameter("xyTupel");
+    private final static ParameterDefinition RGBLIST = createOptionalParameter("RGBList", Rational.ONE);
+    private final static ParameterDefinition BULLETSIZE = createOptionalParameter("Bulletsize", SetlDouble.FIVE);
     public final static PreDefinedProcedure DEFINITION = new PD_plot_addBullets();
 
     private PD_plot_addBullets() {
@@ -26,7 +34,7 @@ public class PD_plot_addBullets extends PreDefinedProcedure {
     }
 
     @Override
-    protected Value execute(State state, HashMap<ParameterDef, Value> args) throws SetlException {
+    protected Value execute(State state, HashMap<ParameterDefinition, Value> args) throws SetlException {
         Canvas canvas;
         SetlList xylist;
 
@@ -51,7 +59,7 @@ public class PD_plot_addBullets extends PreDefinedProcedure {
             throw new UndefinedOperationException("Tupel in second parameter have to be Numbers (Integer or Doubles) ");
         }
 
-        List<List<Double>> bulletList = ConvertSetlTypes.convertSetlListAsDouble(xylist);
+        List<List<Double>> bulletList = ConvertSetlTypes.convertSetlListToListOfListOfDouble(xylist, state);
         double bSize = ConvertSetlTypes.convertNumberToDouble(args.get(BULLETSIZE));
 
 
@@ -64,13 +72,13 @@ public class PD_plot_addBullets extends PreDefinedProcedure {
             if (!(rgblistSetl.size() == 3)) {
                 throw new UndefinedOperationException("Parameter RGBLIST must have exactly three entrys (eq: [0,0,0])");
             }
-            List<Integer> rgblist = ConvertSetlTypes.convertSetlListAsInteger(rgblistSetl);
+            List<Integer> rgblist = ConvertSetlTypes.convertSetlListToListOfInteger(rgblistSetl);
 
             return ConnectJFreeChart.getInstance().addBullets((Canvas) args.get(CANVAS), bulletList, rgblist, bSize);
         }
 
         //if the color parameter is not set
-        List colorList = new ArrayList();
+        List<Integer> colorList = new ArrayList<>();
         colorList.add(0);
         colorList.add(0);
         colorList.add(0);

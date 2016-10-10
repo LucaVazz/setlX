@@ -2,7 +2,7 @@ package org.randoom.setlx.types;
 
 import org.randoom.setlx.exceptions.IncompatibleTypeException;
 import org.randoom.setlx.exceptions.SetlException;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.State;
 
@@ -45,11 +45,11 @@ public class SetlBoolean extends ImmutableValue {
     /* Boolean operations */
 
     @Override
-    public Value conjunction(final State state, final Expr other) throws SetlException {
+    public Value conjunction(final State state, final OperatorExpression other) throws SetlException {
         if (this == FALSE) {
             return FALSE;
         } else { // this == TRUE
-            final Value otr = other.eval(state);
+            final Value otr = other.evaluate(state);
             if (otr == TRUE) {
                 return TRUE;
             } else if (otr == FALSE) {
@@ -65,11 +65,11 @@ public class SetlBoolean extends ImmutableValue {
     }
 
     @Override
-    public Value disjunction(final State state, final Expr other) throws SetlException {
+    public Value disjunction(final State state, final OperatorExpression other) throws SetlException {
         if (this == TRUE) {
             return TRUE;
         } else { // this == FALSE
-            final Value otr = other.eval(state);
+            final Value otr = other.evaluate(state);
             if (otr == TRUE) {
                 return TRUE;
             } else if (otr == FALSE) {
@@ -85,11 +85,11 @@ public class SetlBoolean extends ImmutableValue {
     }
 
     @Override
-    public Value implication(final State state, final Expr other) throws SetlException {
+    public Value implication(final State state, final OperatorExpression other) throws SetlException {
         if (this == FALSE) {
             return TRUE;
         } else { // this == TRUE
-            final Value otr = other.eval(state);
+            final Value otr = other.evaluate(state);
             if (otr == TRUE) {
                 return TRUE;
             } else if (otr == FALSE) {

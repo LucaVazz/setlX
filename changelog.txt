@@ -1,5 +1,30 @@
 Changes (* notice | + feature added, replaced or improved | - feature removed | # bugfix):
 
+---v2.5.0--- 2016-10-01
+ * Note: the setlX start scripts changed - please update yours!
+ * Note: setlX now requires Java7 or higher to run
+ + Changed confusing matching of variables and functions
+   * removed quote expression ('@')
+   + terms must start with an at symbol ('@') instead of an upper case letter
+   + variables can start with upper case letters
+   + added isVariable(term) function, that tests if given term represents a variable
+   * 'internal' terms start with three at symbols ('@@@') instead of one
+   * please (re)read related sections in tutorial for more details and clarifications
+ + forall and exists will set their iteration variables to om, when forall == true and exists == false
+ + added standard library files that are distributed with the interpreter
+ + accessing the members of a matrix will return a vector instead of a list
+ # fixed minor bug in plotting functions
+
+---v2.4.3--- 2016-08-01
+ # fix version number
+ # fix building 1.6 compatible version when tests are enabled
+
+---v2.4.2--- 2016-07-21
+ # prevent concurrent modification during iterations
+
+---v2.4.1--- 2016-07-03
+ # Fix error handling when trying to modify collection during iteration
+
 ---v2.4.0--- 2015-07-05
  + added plotting functionality
 

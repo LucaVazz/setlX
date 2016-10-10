@@ -11,6 +11,7 @@ import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.FragmentList;
 import org.randoom.setlx.utilities.ReturnMessage;
 import org.randoom.setlx.utilities.State;
+import org.randoom.setlx.utilities.TermUtilities;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +31,7 @@ import java.util.List;
  */
 public class Switch extends Statement {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(Switch.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(Switch.class);
 
     private final FragmentList<AbstractSwitchBranch> branchList;
 
@@ -40,7 +41,7 @@ public class Switch extends Statement {
      * @param branchList List of switch branches.
      */
     public Switch(final FragmentList<AbstractSwitchBranch> branchList) {
-        this.branchList = unify(branchList);
+        this.branchList = branchList;
     }
 
     @Override
@@ -54,7 +55,7 @@ public class Switch extends Statement {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
@@ -75,9 +76,10 @@ public class Switch extends Statement {
                 boundHere.retainAll(boundTmp.subList(preBound, boundTmp.size()));
             }
         }
-        if (branchList.get(branchList.size() - 1) instanceof SwitchDefaultBranch) {
+        if (boundHere != null && branchList.get(branchList.size() - 1) instanceof SwitchDefaultBranch) {
             boundVariables.addAll(boundHere);
         }
+        return false;
     }
 
     /* string operations */

@@ -2,7 +2,8 @@ package org.randoom.setlx.types;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
+import org.randoom.setlx.parameters.ParameterList;
 import org.randoom.setlx.statements.Block;
 import org.randoom.setlx.statements.Return;
 import org.randoom.setlx.utilities.*;
@@ -21,9 +22,9 @@ import org.randoom.setlx.utilities.*;
  */
 public class LambdaClosure extends Closure {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(LambdaClosure.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(LambdaClosure.class);
 
-    private final Expr expr; // expression in the body of the definition; used directly only for toString() and toTerm()
+    private final OperatorExpression expr; // expression in the body of the definition; used directly only for toString() and toTerm()
 
     /**
      * Create new lambda definition.
@@ -31,14 +32,15 @@ public class LambdaClosure extends Closure {
      * @param parameters List of parameters.
      * @param expr       lambda-expression.
      */
-    public LambdaClosure(final ParameterList parameters, final Expr expr) {
+    public LambdaClosure(final ParameterList parameters, final OperatorExpression expr) {
         super(parameters, new Block(new Return(ImmutableCodeFragment.unify(expr))));
         this.expr = ImmutableCodeFragment.unify(expr);
     }
+
     private LambdaClosure(
             final ParameterList      parameters,
             final Block              statements,
-            final Expr               expr,
+            final OperatorExpression expr,
             final SetlHashMap<Value> closure
     ) {
         super(parameters, statements, closure);
@@ -64,6 +66,11 @@ public class LambdaClosure extends Closure {
     @Override
     public void appendString(final State state, final StringBuilder sb, final int tabs) {
         object = null;
+        if (closure != null && closure.size() > 0) {
+            sb.append("/* ");
+            closure.appendString(state, sb, 0);
+            sb.append("; */ ");
+        }
         if (parameters.hasSizeOfOne()) {
             parameters.appendString(state, sb);
         } else {
@@ -102,7 +109,7 @@ public class LambdaClosure extends Closure {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
             final ParameterList parameters = ParameterList.termFragmentToParameterList(state, term.firstMember());
-            final Expr          expr       = TermConverter.valueToExpr(state, term.lastMember());
+            final OperatorExpression expr = OperatorExpression.createFromTerm(state, term.lastMember());
             return new LambdaClosure(parameters, expr);
         }
     }

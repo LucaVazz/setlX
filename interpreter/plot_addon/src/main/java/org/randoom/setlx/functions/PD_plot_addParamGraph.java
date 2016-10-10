@@ -2,8 +2,13 @@ package org.randoom.setlx.functions;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
+import org.randoom.setlx.plot.types.Canvas;
+import org.randoom.setlx.plot.utilities.ConnectJFreeChart;
+import org.randoom.setlx.plot.utilities.ConvertSetlTypes;
+import org.randoom.setlx.parameters.ParameterDefinition;
+import org.randoom.setlx.plot.utilities.PlotCheckType;
+import org.randoom.setlx.utilities.State;
 import org.randoom.setlx.types.*;
-import org.randoom.setlx.utilities.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,13 +16,13 @@ import java.util.List;
 
 public class PD_plot_addParamGraph extends PreDefinedProcedure {
 
-    private final static ParameterDef CANVAS = createParameter("canvas");
-    private final static ParameterDef XFUNCTION = createParameter("xFunction");
-    private final static ParameterDef YFUNCTION = createParameter("yFunction");
-    private final static ParameterDef GRAPHNAME = createParameter("graphname");
-    private final static ParameterDef PARAMBOUND = createParameter("ParameterBounds");
-    private final static ParameterDef GRAPHCOLOR = createOptionalParameter("graphcolor (RGB)", Rational.ONE);
-    private final static ParameterDef PLOTAREA = createOptionalParameter("plotArea", SetlBoolean.FALSE);
+    private final static ParameterDefinition CANVAS = createParameter("canvas");
+    private final static ParameterDefinition XFUNCTION = createParameter("xFunction");
+    private final static ParameterDefinition YFUNCTION = createParameter("yFunction");
+    private final static ParameterDefinition GRAPHNAME = createParameter("graphname");
+    private final static ParameterDefinition PARAMBOUND = createParameter("ParameterBounds");
+    private final static ParameterDefinition GRAPHCOLOR = createOptionalParameter("graphcolor (RGB)", Rational.ONE);
+    private final static ParameterDefinition PLOTAREA = createOptionalParameter("plotArea", SetlBoolean.FALSE);
     public final static PreDefinedProcedure DEFINITION = new PD_plot_addParamGraph();
 
     private PD_plot_addParamGraph() {
@@ -32,7 +37,7 @@ public class PD_plot_addParamGraph extends PreDefinedProcedure {
     }
 
     @Override
-    protected Value execute(State state, HashMap<ParameterDef, Value> args) throws SetlException {
+    protected Value execute(State state, HashMap<ParameterDefinition, Value> args) throws SetlException {
 
         if (!PlotCheckType.isCanvas(args.get(CANVAS))) {
             throw new UndefinedOperationException("First parameter canvas has to be a Canvas object (eg. created with plot_createCanvas() )");
@@ -77,7 +82,7 @@ public class PD_plot_addParamGraph extends PreDefinedProcedure {
             throw new UndefinedOperationException("Fifth parameter ParameterBounds has to consist of Numbers (eq. [-1, 3])");
         }
 
-        List<Double> limitsList = ConvertSetlTypes.convertSetlListAsDouble(limitsV);
+        List<Double> limitsList = ConvertSetlTypes.convertSetlListToListOfDouble(limitsV, state);
 
         Value graphColorV = args.get(GRAPHCOLOR);
         Value plotArea = args.get(PLOTAREA);
@@ -102,13 +107,13 @@ public class PD_plot_addParamGraph extends PreDefinedProcedure {
                 throw new UndefinedOperationException("Sixth parameter graphcolor has to consist of exactly three values (eq. [0,0,0])");
             }
 
-            List<Integer> graphColor = ConvertSetlTypes.convertSetlListAsInteger(graphColorS);
+            List<Integer> graphColor = ConvertSetlTypes.convertSetlListToListOfInteger(graphColorS);
             return ConnectJFreeChart.getInstance().addParamGraph(canvas, xFunction, yFunction, graphName, state, graphColor, area, limitsList);
         }
 
 
         //if no optional parameter is set
-        List<Integer> graphColor = new ArrayList();
+        List<Integer> graphColor = new ArrayList<>();
         graphColor.add(0);
         graphColor.add(0);
         graphColor.add(0);

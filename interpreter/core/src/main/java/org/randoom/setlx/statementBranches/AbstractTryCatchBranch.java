@@ -1,10 +1,10 @@
 package org.randoom.setlx.statementBranches;
 
+import org.randoom.setlx.assignments.AssignableVariable;
 import org.randoom.setlx.exceptions.CatchableInSetlXException;
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
 import org.randoom.setlx.exceptions.ThrownInSetlXException;
-import org.randoom.setlx.expressions.Variable;
 import org.randoom.setlx.statements.Block;
 import org.randoom.setlx.types.SetlError;
 import org.randoom.setlx.types.Term;
@@ -22,9 +22,9 @@ import java.util.List;
 public abstract class AbstractTryCatchBranch extends ImmutableCodeFragment {
 
     /** Variable to bind caught exception to.           */
-    protected final Variable errorVar;
+    protected final AssignableVariable errorVar;
     /** Statements to execute when exception is caught. */
-    protected final Block    blockToRecover;
+    protected final Block blockToRecover;
 
     /**
      * Create new catch-branch.
@@ -32,13 +32,13 @@ public abstract class AbstractTryCatchBranch extends ImmutableCodeFragment {
      * @param errorVar       Variable to bind caught exception to.
      * @param blockToRecover Statements to execute when exception is caught.
      */
-    protected AbstractTryCatchBranch(final Variable errorVar, final Block blockToRecover){
-        this.errorVar       = errorVar;
-        this.blockToRecover = unify(blockToRecover);
+    protected AbstractTryCatchBranch(final AssignableVariable errorVar, final Block blockToRecover){
+        this.errorVar       = unify(errorVar);
+        this.blockToRecover = blockToRecover;
     }
 
     @Override
-    public final void collectVariablesAndOptimize (
+    public final boolean collectVariablesAndOptimize (
             final State        state,
             final List<String> boundVariables,
             final List<String> unboundVariables,
@@ -49,6 +49,7 @@ public abstract class AbstractTryCatchBranch extends ImmutableCodeFragment {
         errorVar.collectVariablesAndOptimize(state, boundVariables, boundVariables, boundVariables);
 
         blockToRecover.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
+        return false;
     }
 
     /**
@@ -71,10 +72,10 @@ public abstract class AbstractTryCatchBranch extends ImmutableCodeFragment {
     public final ReturnMessage execute(final State state, final CatchableInSetlXException cise) throws SetlException {
         if (cise instanceof ThrownInSetlXException) {
             // assign directly
-            errorVar.assign(state, ((ThrownInSetlXException) cise).getValue().clone(), getFunctionalCharacter());
+            errorVar.assignUncloned(state, ((ThrownInSetlXException) cise).getValue().clone(), getFunctionalCharacter());
         } else {
             // wrap into error
-            errorVar.assign(state, new SetlError(cise), getFunctionalCharacter());
+            errorVar.assignUncloned(state, new SetlError(cise), getFunctionalCharacter());
         }
         // execute
         return blockToRecover.execute(state);

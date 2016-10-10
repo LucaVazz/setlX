@@ -2,8 +2,13 @@ package org.randoom.setlx.functions;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
+import org.randoom.setlx.plot.types.Canvas;
+import org.randoom.setlx.plot.utilities.ConnectJFreeChart;
+import org.randoom.setlx.plot.utilities.ConvertSetlTypes;
+import org.randoom.setlx.parameters.ParameterDefinition;
+import org.randoom.setlx.plot.utilities.PlotCheckType;
+import org.randoom.setlx.utilities.State;
 import org.randoom.setlx.types.*;
-import org.randoom.setlx.utilities.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,11 +17,11 @@ import java.util.List;
 public class PD_plot_addListGraph extends PreDefinedProcedure {
 
 
-    private final static ParameterDef CANVAS = createParameter(" canvas ");
-    private final static ParameterDef VALUELIST = createParameter(" valuelist ");
-    private final static ParameterDef GRAPHNAME = createParameter(" graphname ");
-    private final static ParameterDef GRAPHCOLOR = createOptionalParameter("graphcolor", Rational.ONE);
-    private final static ParameterDef PLOTAREA = createOptionalParameter("plotarea", SetlBoolean.FALSE);
+    private final static ParameterDefinition CANVAS = createParameter(" canvas ");
+    private final static ParameterDefinition VALUELIST = createParameter(" valuelist ");
+    private final static ParameterDefinition GRAPHNAME = createParameter(" graphname ");
+    private final static ParameterDefinition GRAPHCOLOR = createOptionalParameter("graphcolor", Rational.ONE);
+    private final static ParameterDefinition PLOTAREA = createOptionalParameter("plotarea", SetlBoolean.FALSE);
 
     public final static PreDefinedProcedure DEFINITION = new PD_plot_addListGraph();
 
@@ -30,7 +35,7 @@ public class PD_plot_addListGraph extends PreDefinedProcedure {
     }
 
     @Override
-    protected Value execute(State state, HashMap<ParameterDef, Value> args) throws SetlException {
+    protected Value execute(State state, HashMap<ParameterDefinition, Value> args) throws SetlException {
 
         if (!PlotCheckType.isCanvas(args.get(CANVAS))) {
             throw new UndefinedOperationException("First parameter canvas has to be a Canvas object (eg. created with plot_createCanvas() )");
@@ -57,7 +62,7 @@ public class PD_plot_addListGraph extends PreDefinedProcedure {
             throw new UndefinedOperationException("Second parameter valuelist has to be a List of Lists with Numbers (eq. [[1,2],[3,4],[5,6]])");
         }
 
-        List<List<Double>> valueList = ConvertSetlTypes.convertSetlListAsDouble(valueSetlList);
+        List<List<Double>> valueList = ConvertSetlTypes.convertSetlListToListOfListOfDouble(valueSetlList, state);
         Value graphColorV = args.get(GRAPHCOLOR);
         Value plotArea = args.get(PLOTAREA);
 
@@ -83,13 +88,13 @@ public class PD_plot_addListGraph extends PreDefinedProcedure {
                 throw new UndefinedOperationException("Fourth parameter graphcolor has to consist of exactly three values (eq. [0,0,0])");
             }
 
-            List<Integer> graphColor = ConvertSetlTypes.convertSetlListAsInteger(graphColorS);
+            List<Integer> graphColor = ConvertSetlTypes.convertSetlListToListOfInteger(graphColorS);
 
             return ConnectJFreeChart.getInstance().addListGraph(canvas, valueList, graphNameString, graphColor, area);
         }
 
         //if no optional parameter is set
-        List<Integer> graphColour = new ArrayList();
+        List<Integer> graphColour = new ArrayList<>();
         graphColour.add(0);
         graphColour.add(0);
         graphColour.add(0);

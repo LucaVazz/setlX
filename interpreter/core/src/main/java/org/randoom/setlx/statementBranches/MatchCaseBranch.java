@@ -2,21 +2,13 @@ package org.randoom.setlx.statementBranches;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
-import org.randoom.setlx.expressionUtilities.Condition;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.operatorUtilities.Condition;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.statements.Block;
-import org.randoom.setlx.types.SetlBoolean;
-import org.randoom.setlx.types.SetlList;
-import org.randoom.setlx.types.SetlString;
-import org.randoom.setlx.types.Term;
-import org.randoom.setlx.types.Value;
-import org.randoom.setlx.utilities.CodeFragment;
-import org.randoom.setlx.utilities.MatchResult;
-import org.randoom.setlx.utilities.State;
-import org.randoom.setlx.utilities.TermConverter;
+import org.randoom.setlx.types.*;
+import org.randoom.setlx.utilities.*;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -34,12 +26,12 @@ import java.util.List;
  */
 public class MatchCaseBranch extends AbstractMatchBranch {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(MatchCaseBranch.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(MatchCaseBranch.class);
 
-    private final List<Expr>  exprs;      // expressions which creates terms to match
-    private final List<Value> terms;      // terms to match
-    private final Condition   condition;  // optional condition to confirm match
-    private final Block       statements; // block to execute after match
+    private final FragmentList<OperatorExpression> exprs; // expressions which creates terms to match
+    private final List<Value> terms;                      // terms to match
+    private final Condition condition;                    // optional condition to confirm match
+    private final Block statements;                       // block to execute after match
 
     /**
      * Create new case-branch.
@@ -48,17 +40,17 @@ public class MatchCaseBranch extends AbstractMatchBranch {
      * @param condition  Condition to check before execution.
      * @param statements Statements to execute when condition is met.
      */
-    public MatchCaseBranch(final List<Expr> exprs, final Condition condition, final Block statements) {
+    public MatchCaseBranch(final FragmentList<OperatorExpression> exprs, final Condition condition, final Block statements) {
         this.exprs      = unify(exprs);
         this.terms      = new ArrayList<Value>(exprs.size());
         this.condition  = unify(condition);
-        this.statements = unify(statements);
+        this.statements = statements;
     }
 
     @Override
     public MatchResult matches(final State state, final Value term) throws SetlException {
         if (exprs.size() > terms.size()) {
-            for (final Expr expr: exprs) {
+            for (final OperatorExpression expr: exprs) {
                 terms.add(expr.toTerm(state));
             }
         }
@@ -75,7 +67,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
 
     @Override
     public boolean evalConditionToBool(final State state) throws SetlException {
-        return condition == null || condition.eval(state) == SetlBoolean.TRUE;
+        return condition == null || condition.evaluate(state) == SetlBoolean.TRUE;
     }
 
     @Override
@@ -84,7 +76,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
@@ -94,7 +86,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
            Collect them into a temporary list, add them to boundVariables and
            remove them again before returning. */
         final List<String> tempAssigned = new ArrayList<String>();
-        for (final Expr expr : exprs) {
+        for (final OperatorExpression expr : exprs) {
             expr.collectVariablesAndOptimize(state, new ArrayList<String>(), tempAssigned, tempAssigned);
         }
 
@@ -111,6 +103,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
         for (int i = tempAssigned.size(); i > 0; --i) {
             boundVariables.remove(preIndex + (i - 1));
         }
+        return false;
     }
 
     /* string operations */
@@ -120,13 +113,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
         state.appendLineStart(sb, tabs);
         sb.append("case ");
 
-        final Iterator<Expr> iter = exprs.iterator();
-        while (iter.hasNext()) {
-            iter.next().appendString(state, sb, tabs);
-            if (iter.hasNext()) {
-                sb.append(", ");
-            }
-        }
+        exprs.appendString(state, sb);
 
         if (condition != null) {
             sb.append(" | ");
@@ -146,7 +133,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
         final Term     result   = new Term(FUNCTIONAL_CHARACTER, 3);
 
         final SetlList termList = new SetlList(terms.size());
-        for (final Expr expr: exprs) {
+        for (final OperatorExpression expr: exprs) {
             termList.addMember(state, expr.toTerm(state));
         }
         result.addMember(state, termList);
@@ -175,19 +162,19 @@ public class MatchCaseBranch extends AbstractMatchBranch {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
             try {
-                final SetlList   termList = (SetlList) term.firstMember();
-                final List<Expr> exprs    = new ArrayList<Expr>(termList.size());
+                final SetlList termList = (SetlList) term.firstMember();
+                final FragmentList<OperatorExpression> exprs = new FragmentList<OperatorExpression>(termList.size());
                 for (final Value v : termList) {
-                    exprs.add(TermConverter.valueToExpr(state, v));
+                    exprs.add(OperatorExpression.createFromTerm(state, v));
                 }
                 Condition condition = null;
                 if (! term.getMember(2).equals(SetlString.NIL)) {
-                    condition = TermConverter.valueToCondition(state, term.getMember(2));
+                    condition = TermUtilities.valueToCondition(state, term.getMember(2));
                 }
-                final Block block = TermConverter.valueToBlock(state, term.lastMember());
+                final Block block = TermUtilities.valueToBlock(state, term.lastMember());
                 return new MatchCaseBranch(exprs, condition, block);
             } catch (final SetlException se) {
-                throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
+                throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER, se);
             }
         }
     }
@@ -216,22 +203,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
             if (cmp != 0) {
                 return cmp;
             }
-            final List<Expr> otherList = otr.exprs;
-            final Iterator<Expr> iterFirst  = exprs.iterator();
-            final Iterator<Expr> iterSecond = otherList.iterator();
-            while (iterFirst.hasNext() && iterSecond.hasNext()) {
-                cmp = iterFirst.next().compareTo(iterSecond.next());
-                if (cmp != 0) {
-                    return cmp;
-                }
-            }
-            if (iterFirst.hasNext()) {
-                return 1;
-            }
-            if (iterSecond.hasNext()) {
-                return -1;
-            }
-            return 0;
+            return exprs.compareTo(otr.exprs);
         } else {
             return (this.compareToOrdering() < other.compareToOrdering())? -1 : 1;
         }
@@ -257,19 +229,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
                 } else if (condition == null && otr.condition == null) {
                     conditionEqual = true;
                 }
-                if (conditionEqual) {
-                    final List<Expr> otherList = otr.exprs;
-                    if (exprs.size() == otherList.size()) {
-                        final Iterator<Expr> iterFirst  = exprs.iterator();
-                        final Iterator<Expr> iterSecond = otherList.iterator();
-                        while (iterFirst.hasNext() && iterSecond.hasNext()) {
-                            if ( ! iterFirst.next().equals(iterSecond.next())) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                }
+                return conditionEqual && exprs.equals(otr.exprs);
             }
         }
         return false;
@@ -281,15 +241,7 @@ public class MatchCaseBranch extends AbstractMatchBranch {
         if (condition != null) {
             hash = hash * 31 + condition.hashCode();
         }
-        final int size = exprs.size();
-        hash = hash * 31 + size;
-        if (size > 0) {
-            hash = hash * 31 + exprs.get(0).hashCode();
-            if (size > 1) {
-                hash = hash * 31 + exprs.get(size -1).hashCode();
-            }
-        }
-        return hash;
+        return hash * 31 + exprs.hashCode();
     }
 
     /**

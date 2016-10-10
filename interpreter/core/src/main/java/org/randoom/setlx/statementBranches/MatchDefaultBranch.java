@@ -25,7 +25,7 @@ import java.util.List;
  */
 public class MatchDefaultBranch extends AbstractMatchScanBranch {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(MatchDefaultBranch.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(MatchDefaultBranch.class);
     /**
      * Offset returned when the default branch matched.
      */
@@ -39,7 +39,7 @@ public class MatchDefaultBranch extends AbstractMatchScanBranch {
      * @param statements Statements to execute.
      */
     public MatchDefaultBranch(final Block statements) {
-        this.statements = unify(statements);
+        this.statements = statements;
     }
 
     @Override
@@ -63,13 +63,13 @@ public class MatchDefaultBranch extends AbstractMatchScanBranch {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
     ) {
-        statements.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
+        return statements.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
     }
 
     /* string operations */
@@ -104,7 +104,7 @@ public class MatchDefaultBranch extends AbstractMatchScanBranch {
         if (term.size() != 1) {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
-            final Block block = TermConverter.valueToBlock(state, term.firstMember());
+            final Block block = TermUtilities.valueToBlock(state, term.firstMember());
             return new MatchDefaultBranch(block);
         }
     }

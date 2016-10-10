@@ -1,18 +1,26 @@
 package org.randoom.setlx.types;
 
+import org.randoom.setlx.assignments.AssignableVariable;
 import org.randoom.setlx.exceptions.IncorrectNumberOfParametersException;
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
-import org.randoom.setlx.expressions.Assignment;
-import org.randoom.setlx.expressions.Expr;
-import org.randoom.setlx.expressions.ValueExpr;
-import org.randoom.setlx.expressions.Variable;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
+import org.randoom.setlx.operators.AOperator;
+import org.randoom.setlx.operators.Assignment;
+import org.randoom.setlx.operators.ValueOperator;
 import org.randoom.setlx.statements.Block;
 import org.randoom.setlx.statements.ExpressionStatement;
 import org.randoom.setlx.statements.Return;
 import org.randoom.setlx.statements.Statement;
-import org.randoom.setlx.utilities.*;
+import org.randoom.setlx.utilities.CodeFragment;
+import org.randoom.setlx.utilities.FragmentList;
+import org.randoom.setlx.parameters.ParameterList;
+import org.randoom.setlx.utilities.SetlHashMap;
+import org.randoom.setlx.utilities.State;
+import org.randoom.setlx.utilities.TermUtilities;
+import org.randoom.setlx.utilities.VariableScope;
+import org.randoom.setlx.utilities.WriteBackAgent;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -34,9 +42,9 @@ import java.util.Map.Entry;
  */
 public class SetlClass extends Value {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER      = generateFunctionalCharacter(SetlClass.class);
+    private final static String FUNCTIONAL_CHARACTER      = TermUtilities.generateFunctionalCharacter(SetlClass.class);
     private final static long   COMPARE_TO_ORDER_CONSTANT = generateCompareToOrderConstant(SetlClass.class);
-    private final static Block  REBUILD_MARKER            = new Block(new Return(new ValueExpr(new SetlString(FUNCTIONAL_CHARACTER + COMPARE_TO_ORDER_CONSTANT))));
+    private final static Block  REBUILD_MARKER            = new Block(new Return(new OperatorExpression(new ValueOperator(new SetlString(FUNCTIONAL_CHARACTER + COMPARE_TO_ORDER_CONSTANT)))));
 
     private final ParameterList      parameters;          // parameter list
     private final Block              initBlock;           // statements in the body of the definition
@@ -77,9 +85,12 @@ public class SetlClass extends Value {
     private Block getStaticBlock() {
         if (staticBlock == REBUILD_MARKER) {
             // rebuild static block
-            final FragmentList<Statement> sBlock = new FragmentList<Statement>(staticDefs.size());
+            final FragmentList<Statement> sBlock = new FragmentList<>(staticDefs.size());
             for (final Entry<String, Value> entry : staticDefs.entrySet()) {
-                sBlock.add(new ExpressionStatement(new Assignment(new Variable(entry.getKey()), new ValueExpr(entry.getValue()))));
+                FragmentList<AOperator> assignment = new FragmentList<>();
+                assignment.add(new ValueOperator(entry.getValue()));
+                assignment.add(new Assignment(new AssignableVariable(entry.getKey())));
+                sBlock.add(new ExpressionStatement(new OperatorExpression(assignment)));
             }
             staticBlock = new Block(sBlock);
         }
@@ -105,7 +116,7 @@ public class SetlClass extends Value {
     public SetlClass clone() {
         HashSet<String> initVars = null;
         if (this.initVars != null) {
-            initVars = new HashSet<String>(this.initVars);
+            initVars = new HashSet<>(this.initVars);
         }
         Block staticBlock = null;
         if (getStaticBlock() != null) {
@@ -113,11 +124,11 @@ public class SetlClass extends Value {
         }
         HashSet<String> staticVars = null;
         if (this.staticVars != null) {
-            staticVars = new HashSet<String>(this.staticVars);
+            staticVars = new HashSet<>(this.staticVars);
         }
         SetlHashMap<Value> staticDefs = null;
         if (this.staticDefs != null) {
-            staticDefs = new SetlHashMap<Value>();
+            staticDefs = new SetlHashMap<>();
             for (final Entry<String, Value> entry: this.staticDefs.entrySet()) {
                 staticDefs.put(entry.getKey(), entry.getValue().clone());
             }
@@ -126,38 +137,40 @@ public class SetlClass extends Value {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
     ) {
         /* collect and optimize the inside */
-        final List<String> innerBoundVariables   = new ArrayList<String>();
-        final List<String> innerUnboundVariables = new ArrayList<String>();
-        final List<String> innerUsedVariables    = new ArrayList<String>();
+        final List<String> innerBoundVariables   = new ArrayList<>();
+        final List<String> innerUnboundVariables = new ArrayList<>();
+        final List<String> innerUsedVariables    = new ArrayList<>();
 
         // add all parameters to bound
         parameters.collectVariablesAndOptimize(state, innerBoundVariables, innerBoundVariables, innerBoundVariables);
 
         int preBound = innerBoundVariables.size();
         initBlock.collectVariablesAndOptimize(state, innerBoundVariables, innerUnboundVariables, innerUsedVariables);
-        final HashSet<String> initVars = new HashSet<String>(innerBoundVariables.subList(preBound, innerBoundVariables.size()));
+        final HashSet<String> initVars = new HashSet<>(innerBoundVariables.subList(preBound, innerBoundVariables.size()));
 
         preBound = innerBoundVariables.size();
         if (getStaticBlock() != null) {
             getStaticBlock().collectVariablesAndOptimize(state, innerBoundVariables, innerUnboundVariables, innerUsedVariables);
         }
-        final HashSet<String> staticVars = new HashSet<String>(innerBoundVariables.subList(preBound, innerBoundVariables.size()));
+        final HashSet<String> staticVars = new HashSet<>(innerBoundVariables.subList(preBound, innerBoundVariables.size()));
 
         this.initVars   = initVars;
         this.staticVars = staticVars;
+
+        return false;
     }
 
     /* function call */
 
     @Override
-    public Value call(final State state, final List<Expr> args, final Expr listArg) throws SetlException {
+    public Value call(final State state, List<Value> argumentValues, final FragmentList<OperatorExpression> arguments, final Value listValue, final OperatorExpression listArg) throws SetlException {
         if (staticVars == null) {
             optimize(state);
         }
@@ -168,15 +181,18 @@ public class SetlClass extends Value {
         }
 
         SetlList listArguments = null;
-        if (listArg != null) {
-            Value listArgument = listArg.eval(state);
-            if (listArgument.getClass() != SetlList.class) {
-                throw new UndefinedOperationException("List argument '" + listArg.toString(state) + "' is not a list.");
+        if (listValue != null) {
+            if (listValue.getClass() != SetlList.class) {
+                StringBuilder error = new StringBuilder();
+                error.append("List argument '");
+                listValue.appendString(state, error, 0);
+                error.append("' is not a list.");
+                throw new UndefinedOperationException(error.toString());
             }
-            listArguments = (SetlList) listArgument;
+            listArguments = (SetlList) listValue;
         }
 
-        int nArguments = args.size();
+        int nArguments = argumentValues.size();
         if (listArguments != null) {
             nArguments += listArguments.size();
         }
@@ -190,10 +206,8 @@ public class SetlClass extends Value {
         }
 
         // evaluate arguments
-        final ArrayList<Value> values = new ArrayList<Value>(nArguments);
-        for (final Expr arg : args) {
-            values.add(arg.eval(state));
-        }
+        final ArrayList<Value> values = new ArrayList<>(nArguments);
+        values.addAll(argumentValues);
         if (listArguments != null) {
             for (Value listArgument : listArguments) {
                 values.add(listArgument);
@@ -210,7 +224,7 @@ public class SetlClass extends Value {
         final boolean            rwParameters = parameters.putParameterValuesIntoScope(state, values, FUNCTIONAL_CHARACTER);
 
               WriteBackAgent     wba          = null;
-        final SetlHashMap<Value> members      = new SetlHashMap<Value>();
+        final SetlHashMap<Value> members      = new SetlHashMap<>();
         final SetlObject         newObject    = SetlObject.createNew(members, this);
 
         newScope.linkToThisObject(newObject);
@@ -222,7 +236,7 @@ public class SetlClass extends Value {
 
             // extract 'rw' arguments from scope, store them into WriteBackAgent
             if (rwParameters) {
-                wba = parameters.extractRwParametersFromScope(state, args);
+                wba = parameters.extractRwParametersFromScope(state, arguments);
             }
 
             members.putAll(extractBindings(state, initVars));
@@ -266,7 +280,7 @@ public class SetlClass extends Value {
     }
 
     private SetlHashMap<Value> extractBindings(final State state, final HashSet<String> vars) throws SetlException {
-        final SetlHashMap<Value> bindings = new SetlHashMap<Value>();
+        final SetlHashMap<Value> bindings = new SetlHashMap<>();
 
         for (final String var : vars) {
             final Value value = state.findValue(var);
@@ -288,10 +302,6 @@ public class SetlClass extends Value {
     }
 
     /* features of objects */
-
-    public Value getObjectMember(final State state, final String variable) throws SetlException {
-        return getObjectMemberUnCloned(state, variable).clone();
-    }
 
     @Override
     public Value getObjectMemberUnCloned(final State state, final String variable) throws SetlException {
@@ -360,14 +370,16 @@ public class SetlClass extends Value {
         parameters.appendString(state, sb);
         sb.append(") {");
         sb.append(endl);
-        initBlock.appendString(state, sb, tabs + 1, /* brackets = */ false);
-        if (getStaticBlock() != null) {
+        if (initBlock.size() > 0 || (getStaticBlock() != null && getStaticBlock().size() > 0)) {
+            initBlock.appendString(state, sb, tabs + 1, /* brackets = */ false);
+            if (getStaticBlock() != null) {
+                sb.append(endl);
+                state.appendLineStart(sb, tabs + 1);
+                sb.append("static ");
+                getStaticBlock().appendString(state, sb, tabs + 1, /* brackets = */ true);
+            }
             sb.append(endl);
-            state.appendLineStart(sb, tabs + 1);
-            sb.append("static ");
-            getStaticBlock().appendString(state, sb, tabs + 1, /* brackets = */ true);
         }
-        sb.append(endl);
         state.appendLineStart(sb, tabs);
         sb.append("}");
     }
@@ -404,14 +416,14 @@ public class SetlClass extends Value {
         } else {
             try {
                 final ParameterList parameters  = ParameterList.termFragmentToParameterList(state, term.firstMember());
-                final Block         init        = TermConverter.valueToBlock(state, term.getMember(2));
+                final Block         init        = TermUtilities.valueToBlock(state, term.getMember(2));
                       Block         staticBlock = null;
                 if (! term.lastMember().equals(SetlString.NIL)) {
-                    staticBlock = TermConverter.valueToBlock(state, term.lastMember());
+                    staticBlock = TermUtilities.valueToBlock(state, term.lastMember());
                 }
                 return new SetlClass(parameters, init, staticBlock);
             } catch (final SetlException se) {
-                throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
+                throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER, se);
             }
         }
     }

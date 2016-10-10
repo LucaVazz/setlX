@@ -2,13 +2,13 @@ package org.randoom.setlx.statements;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
-import org.randoom.setlx.expressionUtilities.Condition;
+import org.randoom.setlx.operatorUtilities.Condition;
 import org.randoom.setlx.types.SetlBoolean;
 import org.randoom.setlx.types.Term;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.ReturnMessage;
 import org.randoom.setlx.utilities.State;
-import org.randoom.setlx.utilities.TermConverter;
+import org.randoom.setlx.utilities.TermUtilities;
 
 import java.util.List;
 
@@ -27,7 +27,7 @@ import java.util.List;
  */
 public class DoWhile extends Statement {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(DoWhile.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(DoWhile.class);
 
     private final Condition condition;
     private final Block     statements;
@@ -40,7 +40,7 @@ public class DoWhile extends Statement {
      */
     public DoWhile(final Condition condition, final Block statements) {
         this.condition  = unify(condition);
-        this.statements = unify(statements);
+        this.statements = statements;
     }
 
     @Override
@@ -56,19 +56,19 @@ public class DoWhile extends Statement {
                 }
                 return result;
             }
-        } while (condition.eval(state) == SetlBoolean.TRUE);
+        } while (condition.evaluate(state) == SetlBoolean.TRUE);
         return null;
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
     ) {
-        condition.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
-        statements.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
+        return condition.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables)
+            && statements.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
     }
 
     /* string operations */
@@ -106,8 +106,8 @@ public class DoWhile extends Statement {
         if (term.size() != 2) {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
-            final Condition condition = TermConverter.valueToCondition(state, term.firstMember());
-            final Block     block     = TermConverter.valueToBlock(state, term.lastMember());
+            final Condition condition = TermUtilities.valueToCondition(state, term.firstMember());
+            final Block     block     = TermUtilities.valueToBlock(state, term.lastMember());
             return new DoWhile(condition, block);
         }
     }

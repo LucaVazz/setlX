@@ -1,7 +1,7 @@
 package org.randoom.setlx.statements;
 
 import org.randoom.setlx.exceptions.SetlException;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.types.Value;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.ReturnMessage;
@@ -23,7 +23,7 @@ import java.util.List;
  *        expr
  */
 public class ExpressionStatement extends StatementWithPrintableResult {
-    private final Expr    expr;
+    private final OperatorExpression expr;
     private       boolean printAfterEval;
 
     /**
@@ -31,7 +31,7 @@ public class ExpressionStatement extends StatementWithPrintableResult {
      *
      * @param expression Contained expression.
      */
-    public ExpressionStatement(final Expr expression) {
+    public ExpressionStatement(final OperatorExpression expression) {
         this.expr           = unify(expression);
         this.printAfterEval = false;
     }
@@ -43,7 +43,7 @@ public class ExpressionStatement extends StatementWithPrintableResult {
 
     @Override
     public ReturnMessage execute(final State state) throws SetlException {
-        final Value v = expr.eval(state);
+        final Value v = expr.evaluate(state);
         if (printAfterEval) {
             printResult(state, v);
         }
@@ -51,13 +51,13 @@ public class ExpressionStatement extends StatementWithPrintableResult {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
     ) {
-        expr.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
+        return expr.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
     }
 
     /* string operations */

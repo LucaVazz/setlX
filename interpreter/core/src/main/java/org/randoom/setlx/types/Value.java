@@ -4,13 +4,15 @@ import org.randoom.setlx.exceptions.IncompatibleTypeException;
 import org.randoom.setlx.exceptions.NotAnIntegerException;
 import org.randoom.setlx.exceptions.NumberToLargeException;
 import org.randoom.setlx.exceptions.SetlException;
+import org.randoom.setlx.exceptions.TermConversionException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.utilities.CodeFragment;
+import org.randoom.setlx.utilities.FragmentList;
 import org.randoom.setlx.utilities.MatchResult;
 import org.randoom.setlx.utilities.State;
+import org.randoom.setlx.utilities.TermUtilities;
 
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -22,13 +24,14 @@ public abstract class Value extends CodeFragment {
     public abstract Value clone();
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
     ) {
         /* nothing to collect or optimize (for most, but not all, values) */
+        return true;
     }
 
     /* Boolean operations */
@@ -41,7 +44,7 @@ public abstract class Value extends CodeFragment {
      * @return               Difference of this and subtrahend.
      * @throws SetlException Thrown in case of some (user-) error.
      */
-    public Value conjunction(final State state, final Expr other) throws SetlException {
+    public Value conjunction(final State state, final OperatorExpression other) throws SetlException {
         throw new IncompatibleTypeException(
             "Left-hand-side of '" + this.toString(state) + " && " + other.toString(state) + "' is not a Boolean value."
         );
@@ -55,7 +58,7 @@ public abstract class Value extends CodeFragment {
      * @return               Difference of this and subtrahend.
      * @throws SetlException Thrown in case of some (user-) error.
      */
-    public Value disjunction(final State state, final Expr other) throws SetlException {
+    public Value disjunction(final State state, final OperatorExpression other) throws SetlException {
         throw new IncompatibleTypeException(
             "Left-hand-side of '" + this.toString(state) + " || " + other.toString(state) + "' is not a Boolean value."
         );
@@ -69,7 +72,7 @@ public abstract class Value extends CodeFragment {
      * @return               Difference of this and subtrahend.
      * @throws SetlException Thrown in case of some (user-) error.
      */
-    public Value implication(final State state, final Expr other) throws SetlException {
+    public Value implication(final State state, final OperatorExpression other) throws SetlException {
         throw new IncompatibleTypeException(
             "Left-hand-side of '" + this.toString(state) + " => " + other.toString(state) + "' is not a Boolean value."
         );
@@ -89,15 +92,6 @@ public abstract class Value extends CodeFragment {
     }
 
     /* type checks (sort of Boolean operation) */
-
-    /**
-     * Check if this value is an immutable value, i.e. the contents of it cannot be changed at runtime.
-     *
-     * @return true, if this value is an immutable value
-     */
-    public boolean isImmutable() {
-        return false;
-    }
 
     public SetlBoolean isBoolean() {
         return SetlBoolean.FALSE;
@@ -764,7 +758,15 @@ public abstract class Value extends CodeFragment {
         );
     }
 
-    public void setMember(final State state, final Value index, final Value v) throws SetlException {
+    /**
+     * Set a specified member of this collection value.
+     *
+     * @param state          Current state of the running setlX program.
+     * @param index          The of the member to set. Note: Index starts with 1, not 0.
+     * @param value          The value to set the member to.
+     * @throws SetlException Thrown in case of some (user-) error.
+     */
+    public void setMember(final State state, final Value index, final Value value) throws SetlException {
         throw new IncompatibleTypeException(
             "Can not set member with index '" + index.toString(state) + "' from operand;" +
             " '" + this.toString(state) + "' is not a collection value or direct access is unsupported for this type."
@@ -821,23 +823,19 @@ public abstract class Value extends CodeFragment {
      * Implementation of the function call.
      *
      * @param state          Current state of the running setlX program.
-     * @param args           Arguments of the function call.
+     * @param argumentValues Values of arguments of the function call.
+     * @param arguments      Arguments of the function call.
+     * @param listValue      Value of list argument of the function call.
      * @param listArg        List argument of the function call.
      * @return               Return value of the call.
      * @throws SetlException Thrown in case of some (user-) error.
      */
-    public Value call(final State state, final List<Expr> args, final Expr listArg) throws SetlException {
+    public Value call(final State state, List<Value> argumentValues, final FragmentList<OperatorExpression> arguments, final Value listValue, final OperatorExpression listArg) throws SetlException {
         final StringBuilder error = new StringBuilder();
         error.append("Can not perform call with arguments '");
-        final Iterator<Expr> argIter = args.iterator();
-        while (argIter.hasNext()) {
-            argIter.next().appendString(state, error, 0);
-            if (argIter.hasNext()) {
-                error.append(", ");
-            }
-        }
-        if (listArg != null) {
-            if (! args.isEmpty()) {
+        arguments.appendString(state, error);
+        if (listValue != null) {
+            if (! arguments.isEmpty()) {
                 error.append(", ");
             }
             error.append("*");
@@ -938,6 +936,43 @@ public abstract class Value extends CodeFragment {
         return this.clone();
     }
 
+    /**
+     * Create a Value from a (term-) value representing such a value
+     *
+     * @param state                    Current state of the running setlX program.
+     * @param value                    (Term-) value to convert.
+     * @return                         New Value.
+     * @throws TermConversionException in case the term is malformed.
+     */
+    public static Value createFromTerm(State state, Value value) throws TermConversionException {
+        if (value.getClass() == Term.class) {
+            final Term   term                = (Term) value;
+            final String functionalCharacter = term.getFunctionalCharacter();
+            if (TermUtilities.isInternalFunctionalCharacter(functionalCharacter)) {
+                // special cases
+                if (functionalCharacter.equals(CachedProcedure.getFunctionalCharacter())) {
+                    return CachedProcedure.termToValue(state, term);
+                } else if (functionalCharacter.equals(Closure.getFunctionalCharacter())) {
+                    return Closure.termToValue(state, term);
+                } else if (functionalCharacter.equals(LambdaClosure.getFunctionalCharacter())) {
+                    return LambdaClosure.termToValue(state, term);
+                } else if (functionalCharacter.equals(LambdaProcedure.getFunctionalCharacter())) {
+                    return LambdaProcedure.termToValue(state, term);
+                } else if (functionalCharacter.equals(Procedure.getFunctionalCharacter())) {
+                    return Procedure.termToValue(state, term);
+                } else if (functionalCharacter.equals(SetlClass.getFunctionalCharacter())) {
+                    return SetlClass.termToValue(state, term);
+                } else if (functionalCharacter.equals(SetlObject.getFunctionalCharacter())) {
+                    return SetlObject.termToValue(state, term);
+                } else if (functionalCharacter.equals(Om.getFunctionalCharacter())) {
+                    return Om.OM;
+                }
+            }
+        }
+        // `value' is in fact a (more or less) simple value
+        return value;
+    }
+
     /* comparisons */
 
     /**
@@ -949,6 +984,7 @@ public abstract class Value extends CodeFragment {
      */
     public abstract boolean equalTo (final Object other);
 
+    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
     @Override
     public final boolean equals(final Object o) {
         return this.equalTo(o);

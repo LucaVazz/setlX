@@ -2,9 +2,9 @@ package org.randoom.setlx.utilities;
 
 import org.randoom.setlx.exceptions.IllegalRedefinitionException;
 import org.randoom.setlx.exceptions.SetlException;
+import org.randoom.setlx.types.Om;
 import org.randoom.setlx.types.SetlBoolean;
 import org.randoom.setlx.types.SetlClass;
-import org.randoom.setlx.types.Om;
 import org.randoom.setlx.types.SetlError;
 import org.randoom.setlx.types.SetlObject;
 import org.randoom.setlx.types.SetlString;
@@ -24,7 +24,7 @@ import java.util.TimerTask;
  */
 public class VariableScope {
     // functional characters used in terms
-    private     final static String       FUNCTIONAL_CHARACTER_SCOPE = "^scope";
+    private     final static String       FUNCTIONAL_CHARACTER_SCOPE = TermUtilities.generateFunctionalCharacter("Scope");
 
     /**
      * Marker value to signal that value is indeed set, but not allowed to be accessed.
@@ -33,7 +33,7 @@ public class VariableScope {
     /**
      * Marker binding to signal that value is indeed set, but not allowed to be accessed.
      */
-    private     final static ScopeBinding ACCESS_DENIED_BINDING      = new ScopeBinding(Integer.MAX_VALUE, 0l, ACCESS_DENIED_VALUE);
+    private     final static ScopeBinding ACCESS_DENIED_BINDING      = new ScopeBinding(Integer.MAX_VALUE, 0L, ACCESS_DENIED_VALUE);
 
     private static class ScopeBindings {
         private final Timer                                     timer;
@@ -47,8 +47,8 @@ public class VariableScope {
         private ScopeBindings() {
             timer                 = new Timer(Thread.currentThread().getName() + "::timer", true);
             currentScopeDepth     = 0;
-            validScopeGenerations = new ArrayList<Long>();
-            allBindings           = new HashMap<String, LinkedList<ScopeBinding>>();
+            validScopeGenerations = new ArrayList<>();
+            allBindings           = new HashMap<>();
             thisBindings          = null;
             cleanAllBindings      = false;
 
@@ -114,10 +114,10 @@ public class VariableScope {
     private VariableScope(final ScopeBindings scopeBindings, final int scopeStackDepth, final int restrictedToFunctionsBeneath) {
         this.scopeBindings = scopeBindings;
         if (scopeBindings.validScopeGenerations.size() > scopeStackDepth) {
-            this.scopeGeneration = scopeBindings.validScopeGenerations.get(scopeStackDepth) + 1l;
+            this.scopeGeneration = scopeBindings.validScopeGenerations.get(scopeStackDepth) + 1L;
             scopeBindings.validScopeGenerations.set(scopeStackDepth, this.scopeGeneration);
         } else {
-            this.scopeGeneration = 0l;
+            this.scopeGeneration = 0L;
             scopeBindings.validScopeGenerations.add(this.scopeGeneration);
         }
 
@@ -154,7 +154,7 @@ public class VariableScope {
      *
      * @return The new scope.
      */
-    public VariableScope createInteratorBlock() {
+    public VariableScope createIteratorBlock() {
         final VariableScope newScope     = this.createLinkedScope();
         newScope.writeAsDeepAs           = this.writeAsDeepAs;
         newScope.writeAsDeepAsGeneration = this.writeAsDeepAsGeneration;
@@ -177,8 +177,7 @@ public class VariableScope {
      * Clear all undefined bindings in this scope (value = Om.OM) and all bindings in inner scopes.
      */
     /*package*/ void clearUndefinedAndInnerBindings() {
-        scopeBindings.cleanAllBindings = false;
-        final HashMap<String, LinkedList<ScopeBinding>> cleanBindings = new HashMap<String, LinkedList<ScopeBinding>>();
+        final HashMap<String, LinkedList<ScopeBinding>> cleanBindings = new HashMap<>();
         for (final Map.Entry<String, LinkedList<ScopeBinding>> entry : scopeBindings.allBindings.entrySet()) {
             final LinkedList<ScopeBinding> bindings = entry.getValue();
             ScopeBinding last = clearDeprecatedBindings(bindings);
@@ -199,6 +198,7 @@ public class VariableScope {
             clearDeprecatedBindings(scopeBindings.thisBindings);
         }
         System.gc();
+        scopeBindings.cleanAllBindings = false;
     }
 
     /**
@@ -287,9 +287,9 @@ public class VariableScope {
     }
 
     private ScopeBinding getBinding(final State state, final LinkedList<ScopeBinding> locatedBindings, final String variable, final boolean checkObjects) throws SetlException {
-        final boolean            isThisBinding = variable.equals("this");
-        LinkedList<ScopeBinding> bindings      = null;
+        final boolean            isThisBinding = "this".equals(variable);
         ScopeBinding             binding       = null;
+        LinkedList<ScopeBinding> bindings;
 
         if (isThisBinding) {
             bindings = scopeBindings.thisBindings;
@@ -317,15 +317,33 @@ public class VariableScope {
             }
         }
         // check if some attached object might hold the answer
-        if (checkObjects && ! isThisBinding) {
-            final LinkedList<ScopeBinding> objects = scopeBindings.thisBindings;
-            if (objects != null) {
-                ScopeBinding           object   = clearDeprecatedBindings(objects);
-                Iterator<ScopeBinding> iterator = null;
-                while (object != null && (binding == null || binding.scopeDepth < object.scopeDepth)) {
-                    if (object.scopeDepth > scopeDepth) {
+        if (checkObjects && ! isThisBinding && scopeBindings.thisBindings != null) {
+            ScopeBinding           object   = clearDeprecatedBindings(scopeBindings.thisBindings);
+            Iterator<ScopeBinding> iterator = null;
+            while (object != null && (binding == null || binding.scopeDepth < object.scopeDepth)) {
+                if (object.scopeDepth > scopeDepth) {
+                    if (iterator == null) {
+                        iterator = scopeBindings.thisBindings.descendingIterator();
+                        if (iterator.hasNext()) {
+                            iterator.next(); // "throw away" last one, as that already is current 'object'
+                        }
+                    }
+                    if (iterator.hasNext()) {
+                        object = iterator.next();
+                    } else {
+                        break;
+                    }
+                } else {
+                    final Value member = object.value.getObjectMemberUnCloned(state, variable);
+                    if (member != Om.OM) {
+                        if (object.scopeDepth >= restrictedToFunctionsBeneath || object.value.isProcedure() == SetlBoolean.TRUE) {
+                            return new ScopeBinding(object.scopeDepth, object.scopeGeneration, member);
+                        } else {
+                            return ACCESS_DENIED_BINDING;
+                        }
+                    } else {
                         if (iterator == null) {
-                            iterator = objects.descendingIterator();
+                            iterator = scopeBindings.thisBindings.descendingIterator();
                             if (iterator.hasNext()) {
                                 iterator.next(); // "throw away" last one, as that already is current 'object'
                             }
@@ -334,27 +352,6 @@ public class VariableScope {
                             object = iterator.next();
                         } else {
                             break;
-                        }
-                    } else {
-                        final Value member = object.value.getObjectMemberUnCloned(state, variable);
-                        if (member != Om.OM) {
-                            if (object.scopeDepth >= restrictedToFunctionsBeneath || object.value.isProcedure() == SetlBoolean.TRUE) {
-                                return new ScopeBinding(object.scopeDepth, object.scopeGeneration, member);
-                            } else {
-                                return ACCESS_DENIED_BINDING;
-                            }
-                        } else {
-                            if (iterator == null) {
-                                iterator = objects.descendingIterator();
-                                if (iterator.hasNext()) {
-                                    iterator.next(); // "throw away" last one, as that already is current 'object'
-                                }
-                            }
-                            if (iterator.hasNext()) {
-                                object = iterator.next();
-                            } else {
-                                break;
-                            }
                         }
                     }
                 }
@@ -450,8 +447,8 @@ public class VariableScope {
 
     private void setBinding(final LinkedList<ScopeBinding> locatedBindings, final String variable, final Value value) {
         final boolean            isThisBinding = variable.equals("this");
-        LinkedList<ScopeBinding> bindings      = null;
         ScopeBinding             binding       = null;
+        LinkedList<ScopeBinding> bindings;
 
         if (isThisBinding) {
             bindings = scopeBindings.thisBindings;
@@ -462,7 +459,7 @@ public class VariableScope {
         }
 
         if (bindings == null) {
-            bindings = new LinkedList<ScopeBinding>();
+            bindings = new LinkedList<>();
             if (isThisBinding) {
                 scopeBindings.thisBindings = bindings;
             } else {
@@ -500,8 +497,8 @@ public class VariableScope {
      * @return                 Map of all reachable bindings.
      * @throws SetlException   Thrown in case of some (user-) error.
      */
-    /*package*/ public SetlHashMap<Value> getAllVariablesInScope(final State state, final SetlHashMap<SetlClass> classDefinitions) throws SetlException {
-        final SetlHashMap<Value> allVars = new SetlHashMap<Value>();
+    public SetlHashMap<Value> getAllVariablesInScope(final State state, final SetlHashMap<SetlClass> classDefinitions) throws SetlException {
+        final SetlHashMap<Value> allVars = new SetlHashMap<>();
         // collect all bindings reachable from current scope
         this.collectBindings(state, allVars);
         if (classDefinitions != null) {

@@ -1,11 +1,20 @@
 package org.randoom.setlx.types;
 
+import org.randoom.setlx.assignments.AssignableVariable;
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
-import org.randoom.setlx.expressions.Expr;
-import org.randoom.setlx.expressions.Variable;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.statements.Block;
-import org.randoom.setlx.utilities.*;
+import org.randoom.setlx.utilities.CodeFragment;
+import org.randoom.setlx.utilities.FragmentList;
+import org.randoom.setlx.parameters.ParameterDefinition;
+import org.randoom.setlx.parameters.ParameterList;
+import org.randoom.setlx.utilities.ReturnMessage;
+import org.randoom.setlx.utilities.SetlHashMap;
+import org.randoom.setlx.utilities.State;
+import org.randoom.setlx.utilities.TermUtilities;
+import org.randoom.setlx.utilities.VariableScope;
+import org.randoom.setlx.utilities.WriteBackAgent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +34,7 @@ import java.util.Map;
  */
 public class Closure extends Procedure {
     // functional character used in terms
-    private   final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(Closure.class);
+    private   final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(Closure.class);
 
     /**
      * Variables and values used in closure.
@@ -89,7 +98,7 @@ public class Closure extends Procedure {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
             final State        state,
             final List<String> boundVariables,
             final List<String> unboundVariables,
@@ -110,19 +119,17 @@ public class Closure extends Procedure {
         // upon defining this procedure, all variables which are unbound inside
         // will be read to create the closure for this procedure
         for (final String var : innerUnboundVariables) {
-            //noinspection StringEquality
-            if (var == Variable.getPreventOptimizationDummy()) {
-                continue;
-            } else if (boundVariables.contains(var)) {
+            if (boundVariables.contains(var)) {
                 usedVariables.add(var);
             } else {
                 unboundVariables.add(var);
             }
         }
+        return false;
     }
 
     @Override
-    protected Value callAfterEval(final State state, final List<Expr> args, final List<Value> values, final SetlObject object) throws SetlException {
+    protected Value callAfterEval(final State state, final FragmentList<OperatorExpression> args, final List<Value> values, final SetlObject object) throws SetlException {
         // save old scope
         final VariableScope oldScope = state.getScope();
         // create new scope used for the function call
@@ -138,7 +145,7 @@ public class Closure extends Procedure {
         if (closure != null) {
             for (final Map.Entry<String, Value> entry : closure.entrySet()) {
                 final Value value = entry.getValue();
-                new Variable(entry.getKey()).assignUnclonedCheckUpTo(state, value, oldScope, true, FUNCTIONAL_CHARACTER);
+                new AssignableVariable(entry.getKey()).assignUnclonedCheckUpTo(state, value, oldScope, true, FUNCTIONAL_CHARACTER);
             }
         }
 
@@ -196,7 +203,15 @@ public class Closure extends Procedure {
         sb.append(")");
     }
 
-    /* term operations */
+    @Override
+    protected void appendBeforeStatements(State state, StringBuilder sb, int tabs) {
+        if (closure != null && closure.size() > 0) {
+            sb.append("/* ");
+            closure.appendString(state, sb, tabs);
+            sb.append("; */ ");
+        }
+    }
+/* term operations */
 
     @Override
     public Value toTerm(final State state) throws SetlException {
@@ -225,9 +240,9 @@ public class Closure extends Procedure {
             final SetlList      paramList  = (SetlList) term.firstMember();
             final ParameterList parameters = new ParameterList(paramList.size());
             for (final Value v : paramList) {
-                parameters.add(ParameterDef.valueToParameterDef(state, v));
+                parameters.add(ParameterDefinition.valueToParameterDef(state, v));
             }
-            final Block              block      = TermConverter.valueToBlock(state, term.lastMember());
+            final Block              block      = TermUtilities.valueToBlock(state, term.lastMember());
             return new Closure(parameters, block);
         }
     }

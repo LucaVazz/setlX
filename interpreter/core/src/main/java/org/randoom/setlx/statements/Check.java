@@ -8,7 +8,7 @@ import org.randoom.setlx.types.Term;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.ReturnMessage;
 import org.randoom.setlx.utilities.State;
-import org.randoom.setlx.utilities.TermConverter;
+import org.randoom.setlx.utilities.TermUtilities;
 
 import java.util.List;
 
@@ -28,7 +28,7 @@ import java.util.List;
  */
 public class Check extends Statement {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(Check.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(Check.class);
 
     private final Block statements;
     private final Block recovery;
@@ -40,8 +40,8 @@ public class Check extends Statement {
      * @param recovery   Statements to execute after backtracking.
      */
     public Check(final Block statements, final Block recovery) {
-        this.statements = unify(statements);
-        this.recovery   = unify(recovery);
+        this.statements = statements;
+        this.recovery   = recovery;
     }
 
     @Override
@@ -58,7 +58,7 @@ public class Check extends Statement {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
@@ -74,6 +74,7 @@ public class Check extends Statement {
         while (boundVariables.size() > preBound) {
             boundVariables.remove(boundVariables.size() - 1);
         }
+        return false;
     }
 
     /* string operations */
@@ -115,10 +116,10 @@ public class Check extends Statement {
         if (term.size() != 2) {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
-            final Block block    = TermConverter.valueToBlock(state, term.firstMember());
+            final Block block    = TermUtilities.valueToBlock(state, term.firstMember());
                   Block recovery = null;
             if ( ! term.lastMember().equals(SetlString.NIL)) {
-                recovery = TermConverter.valueToBlock(state, term.lastMember());
+                recovery = TermUtilities.valueToBlock(state, term.lastMember());
             }
             return new Check(block, recovery);
         }

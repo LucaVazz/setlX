@@ -6,6 +6,7 @@ import org.randoom.setlx.types.Term;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.ReturnMessage;
 import org.randoom.setlx.utilities.State;
+import org.randoom.setlx.utilities.TermUtilities;
 
 import java.util.List;
 
@@ -21,7 +22,7 @@ import java.util.List;
  */
 public class Backtrack extends Statement {
     // functional character used in terms
-    private final static String    FUNCTIONAL_CHARACTER = generateFunctionalCharacter(Backtrack.class);
+    private final static String    FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(Backtrack.class);
 
     /**
      * Singleton Backtrack statement.
@@ -36,12 +37,14 @@ public class Backtrack extends Statement {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
-    ) { /* nothing to collect */ }
+    ) {
+        return true;
+    }
 
     /* string operations */
 

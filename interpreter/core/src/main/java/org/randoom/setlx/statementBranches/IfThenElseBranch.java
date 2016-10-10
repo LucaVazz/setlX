@@ -6,7 +6,7 @@ import org.randoom.setlx.statements.Block;
 import org.randoom.setlx.types.Term;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.State;
-import org.randoom.setlx.utilities.TermConverter;
+import org.randoom.setlx.utilities.TermUtilities;
 
 import java.util.List;
 
@@ -25,7 +25,7 @@ import java.util.List;
  */
 public class IfThenElseBranch extends AbstractIfThenBranch {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(IfThenElseBranch.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(IfThenElseBranch.class);
 
     private final Block statements;
 
@@ -35,7 +35,7 @@ public class IfThenElseBranch extends AbstractIfThenBranch {
      * @param statements Statements to execute.
      */
     public IfThenElseBranch(final Block statements){
-        this.statements = unify(statements);
+        this.statements = statements;
     }
 
     @Override
@@ -49,13 +49,13 @@ public class IfThenElseBranch extends AbstractIfThenBranch {
     }
 
     @Override
-    public void collectVariablesAndOptimize (
+    public boolean collectVariablesAndOptimize (
         final State        state,
         final List<String> boundVariables,
         final List<String> unboundVariables,
         final List<String> usedVariables
     ) {
-        statements.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
+        return statements.collectVariablesAndOptimize(state, boundVariables, unboundVariables, usedVariables);
     }
 
     /* string operations */
@@ -87,7 +87,7 @@ public class IfThenElseBranch extends AbstractIfThenBranch {
         if (term.size() != 1) {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
-            final Block block = TermConverter.valueToBlock(state, term.firstMember());
+            final Block block = TermUtilities.valueToBlock(state, term.firstMember());
             return new IfThenElseBranch(block);
         }
     }

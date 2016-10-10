@@ -2,13 +2,13 @@ package org.randoom.setlx.statements;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
-import org.randoom.setlx.expressions.AssignableExpression;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.assignments.AAssignableExpression;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.types.Term;
 import org.randoom.setlx.types.Value;
 import org.randoom.setlx.utilities.ReturnMessage;
 import org.randoom.setlx.utilities.State;
-import org.randoom.setlx.utilities.TermConverter;
+import org.randoom.setlx.utilities.TermUtilities;
 
 /**
  * Implementation of the %= operator, on statement level.
@@ -24,7 +24,7 @@ import org.randoom.setlx.utilities.TermConverter;
  */
 public class ModuloAssignment extends AbstractAssignment {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(ModuloAssignment.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(ModuloAssignment.class);
 
     /**
      * Create new ModuloAssignment.
@@ -32,13 +32,13 @@ public class ModuloAssignment extends AbstractAssignment {
      * @param lhs Expression to assign to.
      * @param rhs Expression to evaluate.
      */
-    public ModuloAssignment(final AssignableExpression lhs, final Expr rhs) {
+    public ModuloAssignment(final AAssignableExpression lhs, final OperatorExpression rhs) {
         super(lhs, rhs);
     }
 
     @Override
     public ReturnMessage execute(final State state) throws SetlException {
-        final Value assigned = lhs.eval(state).moduloAssign(state, rhs.eval(state).clone());
+        final Value assigned = lhs.evaluate(state).moduloAssign(state, rhs.evaluate(state).clone());
         lhs.assignUncloned(state, assigned, FUNCTIONAL_CHARACTER);
 
         if (printAfterEval) {
@@ -72,11 +72,9 @@ public class ModuloAssignment extends AbstractAssignment {
      */
     public static ModuloAssignment termToStatement(final State state, final Term term) throws TermConversionException {
         if (term.size() == 2) {
-            final Expr lhs = TermConverter.valueToExpr(state, term.firstMember());
-            final Expr rhs = TermConverter.valueToExpr(state, term.lastMember());
-            if (lhs instanceof AssignableExpression) {
-                return new ModuloAssignment((AssignableExpression) lhs, rhs);
-            }
+            final AAssignableExpression lhs = TermUtilities.valueToAssignableExpr(state, term.firstMember());
+            final OperatorExpression rhs = OperatorExpression.createFromTerm(state, term.lastMember());
+            return new ModuloAssignment(lhs, rhs);
         }
         throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
     }

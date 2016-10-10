@@ -5,7 +5,7 @@ import org.randoom.setlx.exceptions.NumberToLargeException;
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.SyntaxErrorException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
-import org.randoom.setlx.expressions.StringConstructor;
+import org.randoom.setlx.operators.StringConstructor;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.MatchResult;
 import org.randoom.setlx.utilities.ScanResult;
@@ -468,21 +468,20 @@ public class SetlString extends IndexedCollectionValue {
     }
 
     @Override
-    public Value getMember(final State state, final Value vIndex) throws SetlException {
-        int index = 0;
-        if (vIndex.isInteger() == SetlBoolean.TRUE) {
-            index = vIndex.jIntValue();
+    public Value getMember(final State state, final Value index) throws SetlException {
+        if (index.isInteger() == SetlBoolean.TRUE) {
+            return getMember(index.jIntValue());
         } else {
             throw new IncompatibleTypeException(
-                "Index '" + vIndex + "' is not an integer."
+                "Index '" + index + "' is not an integer."
             );
         }
-        return getMember(index);
     }
 
     @Override
     public Value getMembers(final State state, final Value low, final Value high) throws SetlException {
-        int lowInt = 0, highInt = 0;
+        int lowInt;
+        int highInt;
         if (low.isInteger() == SetlBoolean.TRUE) {
             lowInt = low.jIntValue();
         } else {
@@ -633,34 +632,37 @@ public class SetlString extends IndexedCollectionValue {
     }
 
     @Override
-    public void setMember(final State state, final Value vIndex, final Value v) throws SetlException {
-        separateFromOriginal();
-        int index = 0;
-        if (vIndex.isInteger() == SetlBoolean.TRUE) {
-            index = vIndex.jIntValue();
+    public void setMember(final State state, final Value index, final Value value) throws SetlException {
+        if (index.isInteger() == SetlBoolean.TRUE) {
+            setMember(state, index.jIntValue(), value);
         } else {
             throw new IncompatibleTypeException(
-                "Index '" + vIndex + "' is not a integer."
+                    "Index '" + index + "' is not a integer."
             );
         }
+    }
+
+    @Override
+    public void setMember(final State state, int index, final Value value) throws SetlException {
+        separateFromOriginal();
         if (index < 1) {
             throw new NumberToLargeException(
                 "Index '" + index + "' is lower as '1'."
             );
         }
-        if (v == Om.OM) {
+        if (value == Om.OM) {
             throw new IncompatibleTypeException(
                 "Target value is undefined (om)."
             );
         }
 
-        final String value = v.getUnquotedString(state);
+        final String valueStr = value.getUnquotedString(state);
 
         // in java the index is one lower
         --index;
 
         if (index >= content.length()) {
-            content.ensureCapacity(index + value.length());
+            content.ensureCapacity(index + valueStr.length());
             // fill gap from size to index with banks, if necessary
             while (index >= content.length()) {
                 content.append(" ");
@@ -669,7 +671,7 @@ public class SetlString extends IndexedCollectionValue {
         // remove char at index
         content.deleteCharAt(index);
         // insert value at index
-        content.insert(index, value);
+        content.insert(index, valueStr);
     }
 
     @Override
@@ -858,10 +860,10 @@ public class SetlString extends IndexedCollectionValue {
         } else if (other.getClass() == Term.class) {
             final Term o = (Term) other;
             try {
-                if (o.functionalCharacter(state).getUnquotedString(state).equals(StringConstructor.getFunctionalCharacter())
-                    && o.size() == 2 && o.firstMember().size() == 1 && o.lastMember().size() == 0
+                if (o.getFunctionalCharacter().equals(StringConstructor.getFunctionalCharacter())
+                    && o.size() == 3 && o.getMember(2).size() == 1 && o.lastMember().size() == 0
                 ) {
-                    return matchesTerm(state, o.firstMember().firstMember(state));
+                    return matchesTerm(state, o.getMember(2).firstMember(state));
                 }
             } catch (final SetlException e) { /* just fail in the next line */ }
             return new MatchResult(false);

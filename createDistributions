@@ -8,19 +8,33 @@ setlXlaunchScript="$OVERRIDE_setlXJarDirectory/setlX"
 
 cd "$OVERRIDE_setlXJarDirectory"
 
-# clean the interpreter source
-echo "=> Cleaning the setlX interpreter's source ..."
-ant -autoproxy dist-clean
+echo "=> Cleaning the setlX interpreter's source (1/2) ..."
+mvn clean -P dist-clean
+
+cd ..
+
+# run tests
+if [ "$1" != "noTests" ]; then
+    echo "=> Testing the setlX interpreter ..."
+    ./test_all_examples; rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "=> Errors occured while testing the interpreter."
+        echo "=> Distribution stopped!"
+        exit 1
+    fi
+fi
+
+cd "$OVERRIDE_setlXJarDirectory"
+
+echo "=> Cleaning the setlX interpreter's source (2/2) ..."
+mvn clean -P dist-clean
 
 # build the binary version
 echo "=> Rebuilding the setlX interpreter ..."
-ant -autoproxy jar-j1.6
-if [[ -f "$OVERRIDE_setlXJarDirectory/setlX-j1.6.jar" && "$OVERRIDE_setlXJarDirectory/setlX-gfx-j1.6.jar" && "$OVERRIDE_setlXJarDirectory/setlX-plot-j1.6.jar" ]]; then
-    mv "$OVERRIDE_setlXJarDirectory/setlX-j1.6.jar" "$OVERRIDE_setlXJarDirectory/setlX.jar"
-    mv "$OVERRIDE_setlXJarDirectory/setlX-gfx-j1.6.jar" "$OVERRIDE_setlXJarDirectory/setlX-gfx.jar"
-    mv "$OVERRIDE_setlXJarDirectory/setlX-plot-j1.6.jar" "$OVERRIDE_setlXJarDirectory/setlX-plot.jar"
+mvn install
+if [[ -f "$OVERRIDE_setlXJarDirectory/setlX.jar" && "$OVERRIDE_setlXJarDirectory/setlX-gfx.jar" && "$OVERRIDE_setlXJarDirectory/setlX-plot.jar" ]]; then
     # clean it up again (does not remove the jar)
-    ant -autoproxy clean
+    mvn clean
     echo "=> The setlX interpreter was build correctly."
 else
     echo "=> Building the setlX interpreter failed ..."
@@ -52,17 +66,6 @@ else
 fi
 
 cd ..
-
-# run tests
-if [ "$1" != "noTests" ]; then
-    echo "=> Testing the setlX interpreter ..."
-    ./test_all_examples; rc=$?
-    if [ $rc -ne 0 ]; then
-        echo "=> Errors occured while testing the interpreter."
-        echo "=> Distribution stopped!"
-        exit 1
-    fi
-fi
 
 # create version string for file names
 versionForFileNames=$(echo $version | tr "." "-")
@@ -99,12 +102,12 @@ cd ../grammar_pure
 # clean the pure grammar source
 echo "=> Cleaning the pure grammar source ..."
 make clean
-rm -rf Pure.g
+rm -rf Pure.g4
 
 # update the Pure.g grammar
 echo "=> Updating the pure grammar"
 make update
-if [ -f Pure.g ]
+if [ -f Pure.g4 ]
   then
     # clean the pure grammar source (again)
     make clean
@@ -151,14 +154,14 @@ rm -f "$binOnly.zip"
 rm -f "$examples.zip"
 rm -f "$devel.zip"
 # remove other stuff
-rm -f "diff.result"
-rm -f diff.*.result
+rm -f test_failure.*.result
 
 # create binary only zip
 echo -n "=> Creating binary only distribution ... "
 mkdir -p zipContents
 cp changelog.txt manual.pdf tutorial.pdf $OVERRIDE_setlXJarDirectory/setlX $OVERRIDE_setlXJarDirectory/setlX.cmd $OVERRIDE_setlXJarDirectory/setlX.jar $OVERRIDE_setlXJarDirectory/setlX-gfx.jar $OVERRIDE_setlXJarDirectory/setlX-plot.jar zipContents/.
 cp -r syntax_highlighting zipContents/.
+cp -r interpreter/setlXlibrary zipContents/.
 cd zipContents; zip -qr "../$binOnly.zip" . ; cd ..
 rm -rf zipContents
 echo "done"
@@ -180,7 +183,7 @@ echo "done"
 
 # remove the jars
 cd "$OVERRIDE_setlXJarDirectory"
-ant dist-clean
+mvn clean -P dist-clean
 cd ..
 
 # create development zip

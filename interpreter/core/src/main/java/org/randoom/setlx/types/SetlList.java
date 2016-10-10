@@ -5,11 +5,11 @@ import org.randoom.setlx.exceptions.NumberToLargeException;
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.StopExecutionException;
 import org.randoom.setlx.exceptions.UndefinedOperationException;
-import org.randoom.setlx.expressionUtilities.ExplicitListWithRest;
+import org.randoom.setlx.operatorUtilities.ExplicitListWithRest;
 import org.randoom.setlx.utilities.CodeFragment;
 import org.randoom.setlx.utilities.MatchResult;
 import org.randoom.setlx.utilities.State;
-import org.randoom.setlx.utilities.TermConverter;
+import org.randoom.setlx.utilities.TermUtilities;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -616,41 +616,44 @@ public class SetlList extends IndexedCollectionValue {
     }
 
     @Override
-    public void setMember(final State state, final Value index, final Value v) throws SetlException {
-        separateFromOriginal();
-        int indexValue;
+    public void setMember(final State state, final Value index, final Value value) throws SetlException {
         if (index.isInteger() == SetlBoolean.TRUE) {
-            indexValue = index.jIntValue();
+            setMember(state, index.jIntValue(), value);
         } else {
             throw new IncompatibleTypeException(
                 "Index '" + index + "' is not a integer."
             );
         }
-        if (indexValue < 1) {
+    }
+
+    @Override
+    public void setMember(final State state, int index, final Value value) throws SetlException {
+        separateFromOriginal();
+        if (index < 1) {
             throw new NumberToLargeException(
-                "Index '" + indexValue + "' is lower as '1'."
+                    "Index '" + index + "' is lower as '1'."
             );
         }
 
         // in java the index is one lower
-        --indexValue;
+        --index;
 
-        if (indexValue >= list.size()) {
-            if (v == Om.OM) {
+        if (index >= list.size()) {
+            if (value == Om.OM) {
                 return; // nothing to do
             } else {
-                list.ensureCapacity(indexValue + 1);
+                list.ensureCapacity(index + 1);
                 // fill gap from size to index with OM, if necessary
-                while (indexValue >= list.size()) {
+                while (index >= list.size()) {
                     list.add(Om.OM);
                 }
             }
         }
 
         // set index to value
-        list.set(indexValue, v);
+        list.set(index, value);
 
-        if (v == Om.OM) {
+        if (value == Om.OM) {
             compress();
         }
     }
@@ -696,7 +699,7 @@ public class SetlList extends IndexedCollectionValue {
 
     @Override
     public void appendString(final State state, final StringBuilder sb, final int tabs) {
-        TermConverter.valueToCodeFragment(state, this, false).appendString(state, sb, 0);
+        TermUtilities.appendCodeFragmentString(state, this, sb);
     }
 
     @Override

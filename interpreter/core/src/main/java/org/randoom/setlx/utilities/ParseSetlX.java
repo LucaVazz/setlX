@@ -1,9 +1,9 @@
 package org.randoom.setlx.utilities;
 
 import org.randoom.setlx.exceptions.*;
-import org.randoom.setlx.expressions.Expr;
 import org.randoom.setlx.grammar.SetlXgrammarLexer;
 import org.randoom.setlx.grammar.SetlXgrammarParser;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
 import org.randoom.setlx.statements.Block;
 
 import org.antlr.v4.runtime.*;
@@ -13,16 +13,14 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 /**
  * This class interfaces with the antlr parser and provides some error handling.
  */
 public class ParseSetlX {
 
-    private static enum CodeType {
+    private enum CodeType {
         EXPR,
         BLOCK
     }
@@ -134,7 +132,7 @@ public class ParseSetlX {
      * @throws ParserException        Thrown in case of parser errors.
      * @throws StopExecutionException Thrown when an InterruptedException got caught.
      */
-    public static Expr parseStringToExpr(final State state, final String input) throws ParserException, StopExecutionException {
+    public static OperatorExpression parseStringToExpr(final State state, final String input) throws ParserException, StopExecutionException {
         try {
             final InputStream stream = new ByteArrayInputStream(input.getBytes());
 
@@ -152,8 +150,8 @@ public class ParseSetlX {
         return (Block) handleFragmentParsing(state, input, CodeType.BLOCK);
     }
 
-    private static Expr parseExpr(final State state, final ANTLRInputStream input) throws SyntaxErrorException, StopExecutionException {
-        return (Expr) handleFragmentParsing(state, input, CodeType.EXPR);
+    private static OperatorExpression parseExpr(final State state, final ANTLRInputStream input) throws SyntaxErrorException, StopExecutionException {
+        return (OperatorExpression) handleFragmentParsing(state, input, CodeType.EXPR);
     }
 
     private static CodeFragment handleFragmentParsing(final State state, final ANTLRInputStream input, final CodeType type) throws SyntaxErrorException, StopExecutionException {
@@ -280,7 +278,7 @@ public class ParseSetlX {
         public void exec(State state) {
             switch (type) {
                 case EXPR:
-                    result = parser.initExpr().ae;
+                    result = ImmutableCodeFragment.unify(parser.initExpr().oe);
                     break;
                 case BLOCK:
                     result = parser.initBlock().blk;
@@ -294,11 +292,13 @@ public class ParseSetlX {
         }
 
         public CodeFragment getResult() {
-            return ImmutableCodeFragment.unify(result);
+            return result;
         }
     }
 
     private static class SetlErrorListener extends BaseErrorListener {
+        public static final String EOF_SIGN = "<EOF>";
+        public static final String ALTERNATIVES_KEYWORD = "expecting {";
         private final State state;
 
         /*package*/ SetlErrorListener(final State state) {
@@ -316,24 +316,67 @@ public class ParseSetlX {
             // display position, not index
             ++charPositionInLine;
 
-            final StringBuilder buf = new StringBuilder();
+            final StringBuilder buffer = new StringBuilder();
 
             if (state.isRuntimeDebuggingEnabled() && recognizer instanceof org.antlr.v4.runtime.Parser) {
                 final List<String> stack = ((org.antlr.v4.runtime.Parser)recognizer).getRuleInvocationStack();
                 Collections.reverse(stack);
 
-                buf.append("rule stack: ");
-                buf.append(stack);
-                buf.append("\n");
+                buffer.append("rule stack: ");
+                buffer.append(stack);
+                buffer.append("\n");
             }
-            buf.append("line ");
-            buf.append(line);
-            buf.append(":");
-            buf.append(charPositionInLine);
-            buf.append(" ");
-            buf.append(msg);
+            buffer.append("line ");
+            buffer.append(line);
+            buffer.append(":");
+            buffer.append(charPositionInLine);
+            buffer.append(" ");
 
-            state.writeParserErrLn(buf.toString());
+            if (msg.contains(ALTERNATIVES_KEYWORD) && msg.endsWith("}")) {
+                int keywordLength = ALTERNATIVES_KEYWORD.length();
+                int keywordEnd = msg.indexOf(ALTERNATIVES_KEYWORD) + keywordLength;
+                buffer.append(msg.substring(0, keywordEnd - 1));
+
+                final Iterator<String> alternatives = sortAlternatives(msg.substring(keywordEnd, msg.length() -1)).iterator();
+                while (alternatives.hasNext()) {
+                    buffer.append(alternatives.next());
+                    if (alternatives.hasNext()) {
+                        buffer.append(", ");
+                    }
+                }
+            } else {
+                buffer.append(msg);
+            }
+
+            state.writeParserErrLn(buffer.toString());
+        }
+
+        private Collection<String> sortAlternatives(String listOfAlternatives) {
+            Collection<String> sortedWords = new TreeSet<String>();
+            Collection<String> sortedOperators = new TreeSet<String>();
+            List<String> alternatives = Arrays.asList(listOfAlternatives.split(", "));
+            boolean containsEOF = false;
+            for (String alternative : alternatives) {
+                if (alternative.equals(EOF_SIGN)) {
+                    containsEOF = true;
+                } else {
+                    if (alternative.length() > 1 && alternative.startsWith("'") && alternative.endsWith("'")) {
+                        alternative = alternative.substring(1, alternative.length() - 1);
+                    }
+                    if (alternative.matches("[a-zA-Z]+")) {
+                        sortedWords.add(alternative);
+                    } else {
+                        sortedOperators.add(alternative);
+                    }
+                }
+            }
+            ArrayList<String> allAlternatives = new ArrayList<String>(sortedWords.size() + sortedOperators.size() + 1);
+            allAlternatives.addAll(sortedOperators);
+            allAlternatives.addAll(sortedWords);
+            if (containsEOF) {
+                allAlternatives.add(EOF_SIGN);
+            }
+            return allAlternatives;
         }
     }
 

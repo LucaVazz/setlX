@@ -2,7 +2,8 @@ package org.randoom.setlx.types;
 
 import org.randoom.setlx.exceptions.SetlException;
 import org.randoom.setlx.exceptions.TermConversionException;
-import org.randoom.setlx.expressions.Expr;
+import org.randoom.setlx.operatorUtilities.OperatorExpression;
+import org.randoom.setlx.parameters.ParameterList;
 import org.randoom.setlx.statements.Block;
 import org.randoom.setlx.statements.Return;
 import org.randoom.setlx.utilities.*;
@@ -21,9 +22,9 @@ import org.randoom.setlx.utilities.*;
  */
 public class LambdaProcedure extends Procedure {
     // functional character used in terms
-    private final static String FUNCTIONAL_CHARACTER = generateFunctionalCharacter(LambdaProcedure.class);
+    private final static String FUNCTIONAL_CHARACTER = TermUtilities.generateFunctionalCharacter(LambdaProcedure.class);
 
-    private final Expr expr; // expression in the body of the definition; used directly only for toString() and toTerm()
+    private final OperatorExpression expr; // expression in the body of the definition; used directly only for toString() and toTerm()
 
     /**
      * Create new lambda definition.
@@ -31,14 +32,13 @@ public class LambdaProcedure extends Procedure {
      * @param parameters List of parameters.
      * @param expr       lambda-expression.
      */
-    public LambdaProcedure(final ParameterList parameters, final Expr expr) {
-        super(parameters, new Block(new Return(ImmutableCodeFragment.unify(expr))));
-        this.expr = ImmutableCodeFragment.unify(expr);
+    public LambdaProcedure(final ParameterList parameters, final OperatorExpression expr) {
+        this(parameters, new Block(new Return(ImmutableCodeFragment.unify(expr))), expr);
     }
     private LambdaProcedure(
-        final ParameterList parameters,
-        final Block         statements,
-        final Expr          expr
+        final ParameterList      parameters,
+        final Block              statements,
+        final OperatorExpression expr
     ) {
         super(parameters, statements);
         this.expr = ImmutableCodeFragment.unify(expr);
@@ -96,7 +96,7 @@ public class LambdaProcedure extends Procedure {
             throw new TermConversionException("malformed " + FUNCTIONAL_CHARACTER);
         } else {
             final ParameterList parameters = ParameterList.termFragmentToParameterList(state, term.firstMember());
-            final Expr          expr       = TermConverter.valueToExpr(state, term.lastMember());
+            final OperatorExpression expr = OperatorExpression.createFromTerm(state, term.lastMember());
             return new LambdaProcedure(parameters, expr);
         }
     }
